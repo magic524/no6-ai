@@ -1,0 +1,15 @@
+## Windows Paths
+# path: /mnt/Datasets/Small_Objects_Dataset/RSOD
+# train: images/train 
+# val: images/val 
+# test: images/test
+
+## Linux Paths
+path: /mnt/e/Datasets/Small_Objects_Dataset/RSOD
+train: images/train 
+val: images/val 
+test: images/test
+
+# Classes
+nc: 4
+names: ['aircraft', 'oiltank', 'overpass', 'playground']
