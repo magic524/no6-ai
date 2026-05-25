@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
+from ultralytics.nn.Conv.DEGConv import C3k2_DEGConv
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -1601,6 +1602,7 @@ def parse_model(d, ch, verbose=True):
             C2,
             C2f,
             C3k2,
+            C3k2_DEGConv,
             RepNCSPELAN4,
             ELAN1,
             ADown,
@@ -1627,6 +1629,7 @@ def parse_model(d, ch, verbose=True):
             C2,
             C2f,
             C3k2,
+            C3k2_DEGConv,
             C2fAttn,
             C3,
             C3TR,
