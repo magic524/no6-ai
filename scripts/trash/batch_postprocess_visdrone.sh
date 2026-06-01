@@ -45,14 +45,16 @@ for MODEL in yolo11n yolo11s yolo11m yolo11l yolo11x; do
   PRE=$(echo "$SPEED" | grep -oP '[\d.]+(?=ms preprocess)')
   INF=$(echo "$SPEED" | grep -oP '[\d.]+(?=ms inference)')
   POST=$(echo "$SPEED" | grep -oP '[\d.]+(?=ms postprocess)')
-  TOTAL=$(echo "$PRE + $INF + $POST" | bc 2>/dev/null || echo "10")
-  FPS=$(echo "scale=1; 1000 / $TOTAL" | bc 2>/dev/null || echo "0")
+  TOTAL=$(echo "$PRE + $INF + $POST" | bc 2> /dev/null || echo "10")
+  FPS=$(echo "scale=1; 1000 / $TOTAL" | bc 2> /dev/null || echo "0")
   echo "  mAP50=$MAP50  mAP50:95=$MAP50_95  FPS=$FPS"
 
   # Step 2: eval_ap.py
   echo "[2/4] eval_ap.py..."
   PRED_JSON="runs/detect/$VAL_DIR/predictions.json"
-  AP_S=0; AP_M=0; AP_L=0
+  AP_S=0
+  AP_M=0
+  AP_L=0
   if [ -f "$PRED_JSON" ]; then
     eval_log="/tmp/eval_${MODEL}_VisDrone.log"
     $PY "$EVAL" --gt "$GT" --pred "$PRED_JSON" 2>&1 | tee "$eval_log"
