@@ -10,7 +10,7 @@ train: images/train
 val: images/val
 
 # Class names (15 classes)
-names: 
+names:
   0: small-vehicle
   1: large-vehicle
   2: plane
@@ -26,7 +26,6 @@ names:
   12: basketball-court
   13: bridge
   14: helicopter
-
 # Label format verification (from your example):
 #   class_id center_x center_y width height
 #   0 0.26171875 0.01025390625 0.046875 0.0126953125

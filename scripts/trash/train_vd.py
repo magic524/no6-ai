@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""VisDrone YOLO26n Baseline Training"""
-import sys, os, time
+"""VisDrone YOLO26n Baseline Training."""
+
+import sys
+import time
 
 log_path = "/home/magic524/projects/no6-ai/train_visdrone.log"
 sys.stdout = open(log_path, "w", buffering=1)
@@ -9,6 +11,7 @@ sys.stderr = sys.stdout
 print(f"=== Training started at {time.ctime()} ===")
 print("Importing ultralytics...")
 from ultralytics import YOLO
+
 print("Ultralytics imported OK")
 
 print("Building model yolo26n.yaml...")

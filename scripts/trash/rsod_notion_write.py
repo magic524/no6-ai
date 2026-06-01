@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 """Batch: post-process + Notion write for RSOD DEGConv (corrected runs)."""
-import json, os, csv, time, warnings, sys, io
-warnings.filterwarnings('ignore')
+
+import csv
+import json
+import os
+import sys
+import time
+import warnings
+
+warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/../..")
 
 import torch
+
 from ultralytics import YOLO
-from ultralytics.utils.torch_utils import get_num_params, get_flops
+from ultralytics.utils.torch_utils import get_flops, get_num_params
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from notion_write import write_experiment
 
 RUNS = "runs/detect/DEGConv_ablation/RSOD"
 os.chdir(os.path.dirname(os.path.abspath(__file__)) + "/../..")
+
 
 def measure_fps(weights_path):
     model = YOLO(weights_path)
@@ -28,9 +37,11 @@ def measure_fps(weights_path):
         torch.cuda.synchronize()
     return round(500 / (time.time() - start), 1)
 
+
 def run_eval_ap(gt_json, pred_json):
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
+
     coco_gt = COCO(gt_json)
     with open(pred_json) as f:
         preds = json.load(f)
@@ -57,22 +68,25 @@ def run_eval_ap(gt_json, pred_json):
     stats = evaluator.stats
     return stats[3], stats[4], stats[5]
 
+
 GT = "/mnt/e/Datasets/Small_Objects_Dataset/RSOD/annotations/instances_val.json"
 
 EXPS = [
     # (ds_name, exp_dir_name, variant, model_yaml, model_column_name)
-    ("RSOD", "yolo11n-RSOD-baseline",   "baseline",   "yolo11",           "yolo11"),
-    ("RSOD", "yolo11n-RSOD-V1_backbone","V1_backbone","yolo11-DEGConv",   "yolo11+DEGConv"),
-    ("RSOD", "yolo11n-RSOD-V2_neck",    "V2_neck",    "yolo11-DEGConv-neck","yolo11+DEGConv"),
-    ("RSOD", "yolo11n-RSOD-V3_full",    "V3_full",    "yolo11-DEGConv-full","yolo11+DEGConv"),
-    ("RSOD", "yolo11n-RSOD-V4_shallow", "V4_shallow", "yolo11-DEGConv-shallow","yolo11+DEGConv"),
-    ("RSOD", "yolo11n-RSOD-V5_deep",    "V5_deep",    "yolo11-DEGConv-deep","yolo11+DEGConv"),
+    ("RSOD", "yolo11n-RSOD-baseline", "baseline", "yolo11", "yolo11"),
+    ("RSOD", "yolo11n-RSOD-V1_backbone", "V1_backbone", "yolo11-DEGConv", "yolo11+DEGConv"),
+    ("RSOD", "yolo11n-RSOD-V2_neck", "V2_neck", "yolo11-DEGConv-neck", "yolo11+DEGConv"),
+    ("RSOD", "yolo11n-RSOD-V3_full", "V3_full", "yolo11-DEGConv-full", "yolo11+DEGConv"),
+    ("RSOD", "yolo11n-RSOD-V4_shallow", "V4_shallow", "yolo11-DEGConv-shallow", "yolo11+DEGConv"),
+    ("RSOD", "yolo11n-RSOD-V5_deep", "V5_deep", "yolo11-DEGConv-deep", "yolo11+DEGConv"),
 ]
+
 
 def resolve_yaml(name):
     if name == "yolo11":
         return "ultralytics/cfg/models/11/yolo11.yaml"
     return f"ultralytics/cfg/models/11/DEGConv/{name}.yaml"
+
 
 print("=" * 60)
 print("RSOD DEGConv - Corrected Batch Post-Processing + Notion Write")
@@ -127,12 +141,20 @@ for ds, dname, variant, yn, model_name in EXPS:
     print(f"  FPS={fps:.1f}")
 
     write_experiment(
-        name=name, model=model_name, scale="n", dataset=ds,
-        map50=map50, map50_95=map50_95,
-        ap_s=round(ap_s, 4), ap_m=round(ap_m, 4), ap_l=round(ap_l, 4),
-        fps=fps, params=params, gflops=gflops,
+        name=name,
+        model=model_name,
+        scale="n",
+        dataset=ds,
+        map50=map50,
+        map50_95=map50_95,
+        ap_s=round(ap_s, 4),
+        ap_m=round(ap_m, 4),
+        ap_l=round(ap_l, 4),
+        fps=fps,
+        params=params,
+        gflops=gflops,
     )
     print(f"  => Notion written (model={model_name})")
 
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 print("ALL DONE!")
