@@ -1,27 +1,24 @@
-"""
-从Notion页面保存的val_AP脚本 - 用pycocotools计算AP_s/AP_m/AP_l
-"""
-import json
+"""从Notion页面保存的val_AP脚本 - 用pycocotools计算AP_s/AP_m/AP_l."""
+
 import argparse
-import numpy as np
+import json
+
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
 
 def fix_json(input_file, output_file, annotations_file):
-    """修正 category_id 和 image_id 并保存新的 JSON 文件"""
+    """修正 category_id 和 image_id 并保存新的 JSON 文件."""
     # 读取预测 JSON 文件
-    with open(input_file, "r") as f:
+    with open(input_file) as f:
         predictions = json.load(f)
 
     # 读取 COCO 标注文件
-    with open(annotations_file, "r") as f:
+    with open(annotations_file) as f:
         coco_gt = json.load(f)
 
     # 创建文件名到 image_id 的映射
-    filename_to_id = {
-        img["file_name"].split('/')[-1].replace('.jpg', ''): img["id"] for img in coco_gt["images"]
-    }
+    filename_to_id = {img["file_name"].split("/")[-1].replace(".jpg", ""): img["id"] for img in coco_gt["images"]}
 
     # 修正 category_id 和 image_id
     for item in predictions:
@@ -44,22 +41,22 @@ def fix_json(input_file, output_file, annotations_file):
 
 
 def evaluate_coco(ann_file, pred_file, output_dir=None):
-    """使用 COCO 评测框架计算 AP_s, AP_m, AP_l"""
+    """使用 COCO 评测框架计算 AP_s, AP_m, AP_l."""
     # 加载 COCO 标注和预测
     coco_gt = COCO(ann_file)
     coco_dt = coco_gt.loadRes(pred_file)
 
     # 初始化评估器
-    coco_eval = COCOeval(coco_gt, coco_dt, 'bbox')
+    coco_eval = COCOeval(coco_gt, coco_dt, "bbox")
 
     # 配置评估参数（分小目标、中目标、大目标）
     coco_eval.params.areaRng = [
-        [0, 1e5],          # all (仅占位，实际不计算)
-        [0, 32**2],        # small (0-1024像素)
-        [32**2, 96**2],    # medium (1024-9216像素)
-        [96**2, 1e5**2],   # large (9216+像素)
+        [0, 1e5],  # all (仅占位，实际不计算)
+        [0, 32**2],  # small (0-1024像素)
+        [32**2, 96**2],  # medium (1024-9216像素)
+        [96**2, 1e5**2],  # large (9216+像素)
     ]
-    coco_eval.params.areaRngLbl = ['all', 'small', 'medium', 'large']
+    coco_eval.params.areaRngLbl = ["all", "small", "medium", "large"]
 
     # 运行 COCO 评测
     coco_eval.evaluate()
@@ -68,9 +65,9 @@ def evaluate_coco(ann_file, pred_file, output_dir=None):
 
     # 提取 AP 结果
     stats = coco_eval.stats
-    ap_small = stats[1]   # AP_s
+    ap_small = stats[1]  # AP_s
     ap_medium = stats[2]  # AP_m
-    ap_large = stats[3]   # AP_l
+    ap_large = stats[3]  # AP_l
 
     # 输出到终端
     print(f"\nAP_s (Small):  {ap_small:.3f}")
@@ -84,15 +81,15 @@ def evaluate_coco(ann_file, pred_file, output_dir=None):
 
         results_file = os.path.join(output_dir, "ap_results.txt")
         with open(results_file, "w") as f:
-            f.write(f"COCO AP Evaluation Results\n")
+            f.write("COCO AP Evaluation Results\n")
             f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"Annotations file: {ann_file}\n")
             f.write(f"Predictions file: {pred_file}\n")
-            f.write(f"=" * 50 + "\n\n")
+            f.write("=" * 50 + "\n\n")
             f.write(f"AP_s (Small):  {ap_small:.6f}\n")
             f.write(f"AP_m (Medium): {ap_medium:.6f}\n")
             f.write(f"AP_l (Large):  {ap_large:.6f}\n\n")
-            f.write(f"Detailed COCO stats:\n")
+            f.write("Detailed COCO stats:\n")
             for i, stat in enumerate(stats):
                 f.write(f"stats[{i}]: {stat:.6f}\n")
 
