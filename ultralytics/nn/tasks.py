@@ -20,6 +20,7 @@ from ultralytics.nn.Conv.BinaryAttention import C3k2_BinaryAttention
 from ultralytics.nn.Conv.BinaryAttentionV1 import C3k2_BinaryAttentionV1
 from ultralytics.nn.Conv.BinaryAttentionV2 import C3k2_BinaryAttentionV2
 from ultralytics.nn.Conv.IRA import C3k2_IRA
+from ultralytics.nn.block.WDAM import C2PSA_WDAM
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -1603,6 +1604,7 @@ def parse_model(d, ch, verbose=True):
             SPPF,
             C2fPSA,
             C2PSA,
+            C2PSA_WDAM,
             DWConv,
             Focus,
             BottleneckCSP,
