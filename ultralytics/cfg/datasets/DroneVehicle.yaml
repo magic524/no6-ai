@@ -8,16 +8,15 @@
 #     └── VisDrone  ← downloads here (2.3 GB)
 
 # Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
-## Windows Paths
-path: /mnt/Datasets/Small_Objects_Dataset/DroneVehicle
+path: ../../../datasets/DroneVehicle
 train: images/train 
-val: images/valid 
+val: images/val 
 test: images/test
 
 ## Linux Paths
 # path: /mnt/e/Datasets/Small_Objects_Dataset/DroneVehicle
 # train: images/train 
-# val: images/valid 
+# val: images/val 
 # test: images/test
 
 # Classes

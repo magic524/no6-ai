@@ -1,0 +1,36 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# VisDrone2019-DET dataset https://github.com/VisDrone/VisDrone-Dataset by Tianjin University
+# Documentation: https://docs.ultralytics.com/datasets/detect/visdrone/
+# Example usage: yolo train data=VisDrone.yaml
+# parent
+# ├── ultralytics
+# └── datasets
+#     └── VisDrone  ← downloads here (2.3 GB)
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+#path: ../datasets/VisDrone # dataset root dir
+
+# #WINDOWS PATHS
+# path: E:\Datasets\Nighttime_Dataset\NightDrone # dataset root dir
+# train: images\train # train images (relative to 'path')
+# val: images\val # val images (relative to 'path')
+# test: images\test # test images (relative to 'path')
+#LiNUX PATHS
+path: ../../../datasets/NightDrone # dataset root dir
+train: images/train # train images (relative to 'path')
+val: images/val # val images (relative to 'path')
+test: images/test # test images (relative to 'path')
+
+# Classes
+names:
+  0: car
+  1: truck 
+  2: motor 
+  3: pedestrian 
+  4: van
+  5: tricycle 
+  6: people 
+  7: bus 
+ 
+  
+

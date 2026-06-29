@@ -5,7 +5,7 @@
 # test: images/test
 
 ## Linux Paths
-path: /mnt/e/Datasets/Small_Objects_Dataset/AI-TOD
+path: ../../../datasets/AI-TOD
 train: images/train
 val: images/val
 test: images/test

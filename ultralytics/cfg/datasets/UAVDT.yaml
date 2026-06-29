@@ -1,0 +1,15 @@
+## Windows Paths
+# path: E:\Datasets\Small_Objects_Dataset\UAVDT\UAVDT
+# train: images\train
+# val: images\val
+# test: images\test
+
+## Linux Paths
+path: ../../../datasets/UAVDT
+train: images/train
+val: images/val
+test: images/test
+
+# Classes
+nc: 3
+names: ['car', 'truck', 'bus']

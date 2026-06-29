@@ -32,8 +32,6 @@ setup.py
 ultralytics.egg-info
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other info into it.
 *.manifest
 *.spec
 
@@ -93,19 +91,12 @@ ipython_config.py
 .python-version
 
 # pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
 #Pipfile.lock
 
 # UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
 uv.lock
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+# PEP 582
 __pypackages__/
 
 # Celery stuff
@@ -147,13 +138,13 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# datasets and projects (ignore /datasets dir at root only to allow for docs/en/datasets dir)
+# datasets and projects (ignore /datasets dir at root only)
 /datasets
 runs/
 wandb/
 .DS_Store
 
-# Neural Network weights -----------------------------------------------------------------------------------------------
+# Neural Network weights
 weights/
 *.weights
 *.pt
@@ -203,3 +194,9 @@ calibration_*.npy
 # Training logs
 args.yaml
 results.csv
+
+# ── Hermes Agent ──
+.hermes
+.cloud_ref.md
+YOLO_Experiment_Workflow.md
+scripts/trash/

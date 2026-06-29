@@ -7,7 +7,7 @@
 # test: images/test
 
 # Linux Paths
-path: /mnt/e/Datasets/Small_Objects_Dataset/TinyPerson
+path: ../../../datasets/TinyPerson
 train: images/train 
 val: images/val 
 test: images/test

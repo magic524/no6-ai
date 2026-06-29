@@ -5,7 +5,7 @@
 # val: images/val
 
 # Linux/WSL Paths
-path: /mnt/e/Datasets/Small_Objects_Dataset/DOTA
+path: ../../../datasets/DOTA
 train: images/train
 val: images/val
 

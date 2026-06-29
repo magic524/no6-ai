@@ -5,7 +5,7 @@
 # test: images/test
 
 # Linux Paths
-path: /mnt/e/Datasets/Small_Objects_Dataset/NWPU_VHR-10
+path: ../../../datasets/NWPU_VHR-10
 train: images/train 
 val: images/val 
 test: images/test
