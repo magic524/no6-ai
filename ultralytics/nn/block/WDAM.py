@@ -97,6 +97,11 @@ class WDAM(nn.Module):
         return out
 
     def forward(self, x):
+        # force float32 for DWT compatibility under AMP
+        with torch.cuda.amp.autocast(enabled=False):
+            return self._forward(x.float()).to(dtype=x.dtype)
+
+    def _forward(self, x):
         B, C, H, W = x.shape
         # ========== 修复1：DWT强制输入为偶数尺寸，补齐原图 ==========
         pad_hw = 0
