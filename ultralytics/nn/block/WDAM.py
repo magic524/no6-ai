@@ -2,7 +2,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_wavelets import DWTForward, DWTInverse
 
 
 class WDAM(nn.Module):
@@ -15,9 +14,10 @@ class WDAM(nn.Module):
         self.shift_size = shift_size
         self.window_size = window_size
         self.temperature = nn.Parameter(torch.ones(num_heads, 1, 1))
-        # 小波变换
-        self.dwt = DWTForward(J=1, wave='haar')
-        self.idwt = DWTInverse(wave='haar')
+
+        # Manual Haar DWT/IDWT filters (AMP-safe, no custom autograd)
+        self._init_wavelet_filters()
+
         # 高频分支
         self.high_conv = nn.Sequential(
             nn.Conv2d(dim*2, dim*2, 3, padding=1, groups=2, bias=bias),
@@ -46,6 +46,99 @@ class WDAM(nn.Module):
         relative_coords[:, :, 0] *= 2*window_size - 1
         relative_position_index = relative_coords.sum(-1)
         self.register_buffer("relative_position_index", relative_position_index)
+
+    def _init_wavelet_filters(self):
+        """Haar wavelet filters as buffers (not parameters) for AMP-safe DWT/IDWT."""
+        # Haar: low=[1,1]/sqrt(2), high=[1,-1]/sqrt(2) -- orthogonal
+        h0 = torch.tensor([1.0, 1.0]) / (2 ** 0.5)  # low-pass
+        h1 = torch.tensor([1.0, -1.0]) / (2 ** 0.5)  # high-pass
+
+        # 2D separable filters (outer product)
+        ll = (h0[:, None] * h0[None, :]).view(1, 1, 2, 2)  # LL
+        lh = (h0[:, None] * h1[None, :]).view(1, 1, 2, 2)  # LH
+        hl = (h1[:, None] * h0[None, :]).view(1, 1, 2, 2)  # HL
+        hh = (h1[:, None] * h1[None, :]).view(1, 1, 2, 2)  # HH
+
+        # DWT filters (same as forward)
+        self.register_buffer('dwt_ll', ll)
+        self.register_buffer('dwt_lh', lh)
+        self.register_buffer('dwt_hl', hl)
+        self.register_buffer('dwt_hh', hh)
+
+        # IDWT filters (same kernels for orthogonal Haar)
+        self.register_buffer('idwt_ll', ll)
+        self.register_buffer('idwt_lh', lh)
+        self.register_buffer('idwt_hl', hl)
+        self.register_buffer('idwt_hh', hh)
+
+    def _dwt(self, x):
+        """Haar 2D DWT via F.conv2d -- fully AMP compatible."""
+        C = x.shape[1]
+        groups = C
+        w_ll = self.dwt_ll.expand(C, -1, -1, -1)
+        w_lh = self.dwt_lh.expand(C, -1, -1, -1)
+        w_hl = self.dwt_hl.expand(C, -1, -1, -1)
+        w_hh = self.dwt_hh.expand(C, -1, -1, -1)
+        LL = F.conv2d(x, w_ll, stride=2, groups=groups)
+        LH = F.conv2d(x, w_lh, stride=2, groups=groups)
+        HL = F.conv2d(x, w_hl, stride=2, groups=groups)
+        HH = F.conv2d(x, w_hh, stride=2, groups=groups)
+        return LL, LH, HL, HH
+
+    def _idwt(self, LL, LH, HL, HH):
+        """Haar 2D IDWT via F.conv_transpose2d -- fully AMP compatible."""
+        C = LL.shape[1]
+        groups = C
+        w_ll = self.idwt_ll.expand(C, -1, -1, -1)
+        w_lh = self.idwt_lh.expand(C, -1, -1, -1)
+        w_hl = self.idwt_hl.expand(C, -1, -1, -1)
+        w_hh = self.idwt_hh.expand(C, -1, -1, -1)
+        x = F.conv_transpose2d(LL, w_ll, stride=2, groups=groups)
+        x = x + F.conv_transpose2d(LH, w_lh, stride=2, groups=groups)
+        x = x + F.conv_transpose2d(HL, w_hl, stride=2, groups=groups)
+        x = x + F.conv_transpose2d(HH, w_hh, stride=2, groups=groups)
+        return x
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        # ========== 修复1：DWT强制输入为偶数尺寸，补齐原图 ==========
+        pad_hw = 0
+        if H % 2 != 0 or W % 2 != 0:
+            pad_hw = 1
+            x_pad = F.pad(x, (0, W%2, 0, H%2), mode='constant', value=0)
+        else:
+            x_pad = x
+        # DWT分解
+        LL, LH, HL, HH = self._dwt(x_pad)
+        # 高频融合权重
+        filter_hv = self.high_conv(torch.cat([LH, HL], dim=1))
+        # QKV
+        qkv = self.qkv_dwconv(self.qkv(LL))
+        q, k, v_inp = qkv.chunk(3, dim=1)
+        v = v_inp * filter_hv + v_inp
+        # ========== 修复2：q/k/v共用同一套padding参数 ==========
+        ll_shifted = self.shift(LL, self.shift_size)
+        win_q, pad_h, pad_w, llH, llW = self.window_partition(ll_shifted)
+        win_k, _, _, _, _ = self.window_partition(ll_shifted)
+        win_v, _, _, _, _ = self.window_partition(v)
+        B_win, Cq, ws, _ = win_q.shape
+        hd = Cq // self.num_heads
+        q = win_q.view(B_win, self.num_heads, hd, ws*ws)
+        k = win_k.view(B_win, self.num_heads, hd, ws*ws)
+        v = win_v.view(B_win, self.num_heads, hd, ws*ws)
+        attn_out = self.window_attn(q, k, v)
+        attn_out = attn_out.view(B_win, Cq, ws, ws)
+        ll_out = self.window_reverse(attn_out, pad_h, pad_w, llH, llW)
+        ll_out = self.rev_shift(ll_out, self.shift_size)
+        ll_out = self.project_out(ll_out)
+        # 高频重建
+        h_all = self.high_out(torch.cat([LH, HL, HH], dim=1))
+        LH_new, HL_new, HH_new = h_all.chunk(3, dim=1)
+        recon = self._idwt(ll_out, LH_new, HL_new, HH_new)
+        # ========== 修复3：还原回原图原始尺寸，保证残差相加维度完全一致 ==========
+        if pad_hw > 0:
+            recon = recon[..., :H, :W]
+        return recon
 
     def window_partition(self, x):
         B, C, H, W = x.shape
@@ -95,55 +188,6 @@ class WDAM(nn.Module):
         attn = attn.softmax(dim=-1)
         out = torch.matmul(v, attn.transpose(-2, -1))
         return out
-
-    @torch.cuda.amp.custom_fwd(cast_inputs=torch.float32)
-    def forward(self, x):
-        # force float32 for DWT compatibility under AMP
-        return self._forward(x.float()).to(dtype=x.dtype)
-
-    def _forward(self, x):
-        B, C, H, W = x.shape
-        # ========== 修复1：DWT强制输入为偶数尺寸，补齐原图 ==========
-        pad_hw = 0
-        if H % 2 != 0 or W % 2 != 0:
-            pad_hw = 1
-            x_pad = F.pad(x, (0, W%2, 0, H%2), mode='constant', value=0)
-        else:
-            x_pad = x
-        # DWT分解：强制float32
-        LL, Yh = self.dwt(x_pad)
-        Yh = Yh[0]
-        LH, HL, HH = Yh[:, :, 0], Yh[:, :, 1], Yh[:, :, 2]
-        # 高频融合权重
-        filter_hv = self.high_conv(torch.cat([LH, HL], dim=1))
-        # QKV
-        qkv = self.qkv_dwconv(self.qkv(LL))
-        q, k, v_inp = qkv.chunk(3, dim=1)
-        v = v_inp * filter_hv + v_inp
-        # ========== 修复2：q/k/v共用同一套padding参数 ==========
-        ll_shifted = self.shift(LL, self.shift_size)
-        win_q, pad_h, pad_w, llH, llW = self.window_partition(ll_shifted)
-        win_k, _, _, _, _ = self.window_partition(ll_shifted)
-        win_v, _, _, _, _ = self.window_partition(v)
-        B_win, Cq, ws, _ = win_q.shape
-        hd = Cq // self.num_heads
-        q = win_q.view(B_win, self.num_heads, hd, ws*ws)
-        k = win_k.view(B_win, self.num_heads, hd, ws*ws)
-        v = win_v.view(B_win, self.num_heads, hd, ws*ws)
-        attn_out = self.window_attn(q, k, v)
-        attn_out = attn_out.view(B_win, Cq, ws, ws)
-        ll_out = self.window_reverse(attn_out, pad_h, pad_w, llH, llW)
-        ll_out = self.rev_shift(ll_out, self.shift_size)
-        ll_out = self.project_out(ll_out)
-        # 高频重建
-        h_all = self.high_out(torch.cat([LH, HL, HH], dim=1))
-        LH_new, HL_new, HH_new = h_all.chunk(3, dim=1)
-        Yh_new = torch.stack([LH_new, HL_new, HH_new], dim=2)
-        recon = self.idwt((ll_out, [Yh_new]))
-        # ========== 修复3：还原回原图原始尺寸，保证残差相加维度完全一致 ==========
-        if pad_hw > 0:
-            recon = recon[..., :H, :W]
-        return recon
 
 
 class C2PSA_WDAM(nn.Module):
