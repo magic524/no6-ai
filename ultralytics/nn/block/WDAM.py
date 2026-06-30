@@ -96,6 +96,7 @@ class WDAM(nn.Module):
         out = torch.matmul(v, attn.transpose(-2, -1))
         return out
 
+    @torch.cuda.amp.custom_fwd(cast_inputs=torch.float32)
     def forward(self, x):
         # force float32 for DWT compatibility under AMP
         return self._forward(x.float()).to(dtype=x.dtype)
@@ -110,7 +111,6 @@ class WDAM(nn.Module):
         else:
             x_pad = x
         # DWT分解：强制float32
-        x_pad = x_pad.float()
         LL, Yh = self.dwt(x_pad)
         Yh = Yh[0]
         LH, HL, HH = Yh[:, :, 0], Yh[:, :, 1], Yh[:, :, 2]
