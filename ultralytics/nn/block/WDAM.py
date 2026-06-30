@@ -98,7 +98,7 @@ class WDAM(nn.Module):
 
     def forward(self, x):
         # force float32 for DWT compatibility under AMP
-        with torch.cuda.amp.autocast(enabled=False):
+        with torch.amp.autocast('cuda', enabled=False):
             return self._forward(x.float()).to(dtype=x.dtype)
 
     def _forward(self, x):
