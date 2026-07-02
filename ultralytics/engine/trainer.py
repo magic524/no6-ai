@@ -641,7 +641,16 @@ class BaseTrainer:
         ema = deepcopy(unwrap_model(self.ema.ema)).half()
         if not all(torch.isfinite(v).all() for v in ema.state_dict().values() if isinstance(v, torch.Tensor)):
             LOGGER.warning(f"Skipping checkpoint save at epoch {self.epoch}: EMA contains NaN/Inf")
-            return False
+            # Reset EMA from model weights to recover from NaN/Inf, then retry
+            raw = unwrap_model(self.model).state_dict()
+            for k, v in ema.state_dict().items():
+                if v.dtype.is_floating_point and k in raw:
+                    v.data.copy_(raw[k].half())
+            if all(torch.isfinite(v).all() for v in ema.state_dict().values() if isinstance(v, torch.Tensor)):
+                LOGGER.warning(f"Recovered EMA from model weights at epoch {self.epoch}")
+            else:
+                LOGGER.warning(f"Model weights also contain NaN/Inf at epoch {self.epoch}, skipping save")
+                return False
 
         # Serialize ckpt to a byte buffer once (faster than repeated torch.save() calls)
         buffer = io.BytesIO()
