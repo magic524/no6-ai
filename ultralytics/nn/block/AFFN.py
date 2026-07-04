@@ -27,9 +27,9 @@ class AFFN(nn.Module):
         )
         self.project_out = nn.Conv2d(hidden_features, out_features, kernel_size=1, bias=bias)
 
-        # Learnable fusion weights
-        self.alpha = nn.Parameter(torch.tensor(0.5))
-        self.beta = nn.Parameter(torch.tensor(0.5))
+        # Learnable fusion weights (small init to avoid gradient explosion)
+        self.alpha = nn.Parameter(torch.tensor(0.01))
+        self.beta = nn.Parameter(torch.tensor(0.01))
 
     def forward(self, x):
         x = self.project_in(x)
@@ -41,14 +41,15 @@ class AFFN(nn.Module):
         # Global FFT (no patch split)
         Xf = torch.fft.rfft2(x_float)
 
-        # Auto-correlation power spectrum
-        power = Xf * torch.conj(Xf)
+        # Normalized auto-correlation power spectrum
+        # Divide by spatial area to keep values in stable range
+        power = (Xf * torch.conj(Xf)).real / (H * W)
         R = torch.fft.irfft2(power, s=(H, W))
 
-        # Frequency + spatial domain fusion
-        Xf_new = Xf + self.alpha.to(dtype=Xf.real.dtype) * power
+        # Frequency + spatial domain fusion (small weights = near-identity init)
+        Xf_new = Xf + self.alpha * (Xf / (H * W))
         x_out = torch.fft.irfft2(Xf_new, s=(H, W))
-        x_out = x_out + self.beta.to(dtype=R.dtype) * R
+        x_out = x_out + self.beta * R
 
         # Restore dtype
         x = x_out.to(dtype=original_dtype)
