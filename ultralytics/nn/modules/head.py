@@ -20,7 +20,171 @@ from .conv import Conv, DWConv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "OBB", "Classify", "Detect", "Pose", "RTDETRDecoder", "Segment", "YOLOEDetect", "YOLOESegment", "v10Detect"
+__all__ = "OBB", "Classify", "Detect", "Pose", "RTDETRDecoder", "Segment", "TGADetect", "YOLOEDetect", "YOLOESegment", "v10Detect"
+
+
+
+
+
+
+
+
+class TGADetect(nn.Module):
+    """YOLO11 Task-Guided Attention-Decoupled Head (TGADHead).
+
+    Reference: Zuo et al. "TGADHead: An efficient and accurate task-guided attention-decoupled
+    head for single-stage object detection." Knowledge-Based Systems, 2024.
+
+    Architecture:
+        Input (P3, P4, P5) -> [Convx2 / DWConvx4 per scale] ->
+        -> TIM (Task Interaction Module: reg <-> cls 1x1 cross-gating residual) ->
+        -> TSAM (Task-Specific Attention Module: SE-style per-task channel attention) ->
+        -> Final 1x1 pred convs -> boxes + scores
+    """
+
+    dynamic = False
+    export = False
+    format = None
+    max_det = 300
+    agnostic_nms = False
+    shape = None
+    anchors = torch.empty(0)
+    strides = torch.empty(0)
+    legacy = False
+    xyxy = False
+
+    def __init__(self, nc: int = 80, reg_max: int = 16, end2end: bool = False, ch: tuple = ()):
+        super().__init__()
+        self.nc = nc
+        self.nl = len(ch)
+        self.reg_max = reg_max
+        self.no = nc + self.reg_max * 4
+        self.stride = torch.zeros(self.nl)
+
+        c2 = max(16, ch[0] // 4, self.reg_max * 4)
+        c3 = max(ch[0], min(self.nc, 100))
+
+        self.reg_feat = nn.ModuleList(
+            nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3)) for x in ch
+        )
+        self.cls_feat = nn.ModuleList(
+            nn.Sequential(
+                nn.Sequential(DWConv(x, x, 3), Conv(x, c3, 1)),
+                nn.Sequential(DWConv(c3, c3, 3), Conv(c3, c3, 1)),
+            ) for x in ch
+        )
+
+        self.tim_cls2reg = nn.Conv2d(c3, c2, 1)
+        self.tim_reg2cls = nn.Conv2d(c2, c3, 1)
+
+        self.tsam_cls = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(c3, max(c3 // 4, 1), 1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(max(c3 // 4, 1), c3, 1),
+            nn.Sigmoid(),
+        )
+        self.tsam_reg = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(c2, max(c2 // 4, 1), 1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(max(c2 // 4, 1), c2, 1),
+            nn.Sigmoid(),
+        )
+
+        self.reg_pred = nn.ModuleList(nn.Conv2d(c2, 4 * self.reg_max, 1) for _ in ch)
+        self.cls_pred = nn.ModuleList(nn.Conv2d(c3, self.nc, 1) for _ in ch)
+
+        self.dfl = DFL(self.reg_max) if self.reg_max > 1 else nn.Identity()
+
+        if end2end:
+            self._end2end = True
+            self.one2one_reg_pred = copy.deepcopy(self.reg_pred)
+            self.one2one_cls_pred = copy.deepcopy(self.cls_pred)
+        else:
+            self._end2end = False
+
+    @property
+    def end2end(self):
+        return getattr(self, '_end2end', False)
+
+    @end2end.setter
+    def end2end(self, value):
+        self._end2end = value
+
+    def forward_head(self, x: list[torch.Tensor]) -> dict[str, torch.Tensor]:
+        bs = x[0].shape[0]
+        boxes_list, scores_list = [], []
+
+        for i in range(self.nl):
+            reg_f = self.reg_feat[i](x[i])
+            cls_f = self.cls_feat[i](x[i])
+
+            # TIM: cross-task interaction (residual)
+            reg_f = reg_f + self.tim_cls2reg(cls_f)
+            cls_f = cls_f + self.tim_reg2cls(reg_f)
+
+            # TSAM: per-task channel attention
+            reg_f = reg_f * self.tsam_reg(reg_f)
+            cls_f = cls_f * self.tsam_cls(cls_f)
+
+            boxes_list.append(self.reg_pred[i](reg_f).view(bs, 4 * self.reg_max, -1))
+            scores_list.append(self.cls_pred[i](cls_f).view(bs, self.nc, -1))
+
+        return dict(
+            boxes=torch.cat(boxes_list, dim=-1),
+            scores=torch.cat(scores_list, dim=-1),
+            feats=x,
+        )
+
+    def forward(self, x):
+        preds = self.forward_head(x)
+        if self.training:
+            return preds
+        y = self._inference(preds)
+        return y if self.export else (y, preds)
+
+    def _inference(self, x):
+        shape = x['feats'][0].shape
+        if self.dynamic or self.shape != shape:
+            self.anchors, self.strides = (a.transpose(0, 1) for a in make_anchors(x['feats'], self.stride, 0.5))
+            self.shape = shape
+        dbox = self.decode_bboxes(self.dfl(x['boxes']), self.anchors.unsqueeze(0)) * self.strides
+        return torch.cat((dbox, x['scores'].sigmoid()), 1)
+
+    def bias_init(self):
+        for i in range(self.nl):
+            self.reg_pred[i].bias.data[:] = 2.0
+            self.cls_pred[i].bias.data[:self.nc] = math.log(
+                5 / self.nc / (640 / self.stride[i]) ** 2
+            )
+
+    def decode_bboxes(self, bboxes, anchors, xywh=True):
+        return dist2bbox(bboxes, anchors, xywh=xywh and not self.export, dim=1)
+
+    def postprocess(self, preds):
+        boxes, scores = preds.split([4, self.nc], dim=-1)
+        scores, conf, idx = self._topk(scores, self.max_det)
+        boxes = boxes.gather(dim=1, index=idx.repeat(1, 1, 4))
+        return torch.cat([boxes, scores, conf], dim=-1)
+
+    def _topk(self, scores, max_det):
+        batch_size, anchors, nc = scores.shape
+        k = max_det if self.export else min(max_det, anchors)
+        if self.agnostic_nms:
+            scores, labels = scores.max(dim=-1, keepdim=True)
+            scores, indices = scores.topk(k, dim=1)
+            labels = labels.gather(1, indices)
+            return scores, labels, indices
+        ori_index = scores.max(dim=-1)[0].topk(k)[1].unsqueeze(-1)
+        scores = scores.gather(dim=1, index=ori_index.repeat(1, 1, nc))
+        scores, index = scores.flatten(1).topk(k)
+        idx = ori_index[torch.arange(batch_size)[..., None], index // nc]
+        return scores[..., None], (index % nc)[..., None].float(), idx
+
+    def fuse(self):
+        pass
+
 
 
 class Detect(nn.Module):
