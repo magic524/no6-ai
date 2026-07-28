@@ -5,7 +5,7 @@
 # test: images/test
 
 ## Linux Paths
-path: /home/magic524/projects/no6-ai/datasets/RSOD
+path: ../../../datasets/RSOD
 train: images/train 
 val: images/val 
 test: images/test
