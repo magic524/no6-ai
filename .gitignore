@@ -200,3 +200,6 @@ results.csv
 .cloud_ref.md
 YOLO_Experiment_Workflow.md
 scripts/trash/
+# Training cache (Hermes-added)
+*.npy
+*.cache
