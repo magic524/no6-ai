@@ -22,6 +22,7 @@ from ultralytics.nn.Conv.BinaryAttentionV2 import C3k2_BinaryAttentionV2
 from ultralytics.nn.Conv.IRA import C3k2_IRA
 from ultralytics.nn.block.WDAM import C2PSA_WDAM
 from ultralytics.nn.block.AFFN import C2PSA_AFFN
+from ultralytics.nn.block.DMSSP import DMSSP
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -83,6 +84,7 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     YOLOESegment26,
     v10Detect,
+    TGADetect,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, SETTINGS, WINDOWS, YAML, colorstr, emojis
 from ultralytics.utils.checks import REMOTE_FILE_PREFIXES, check_file, check_requirements, check_suffix, check_yaml
@@ -407,7 +409,7 @@ class DetectionModel(BaseModel):
 
         # Build strides
         m = self.model[-1]  # Detect()
-        if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
+        if isinstance(m, (Detect, TGADetect)):  # includes all Detect/TGADetect subclasses
             s = 256  # 2x min stride
             m.inplace = self.inplace
 
@@ -1639,6 +1641,7 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
+            DMSSP,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
@@ -1724,6 +1727,7 @@ def parse_model(d, ch, verbose=True):
         elif m in frozenset(
             {
                 Detect,
+                TGADetect,
                 WorldDetect,
                 YOLOEDetect,
                 Segment,
@@ -1739,7 +1743,7 @@ def parse_model(d, ch, verbose=True):
             args.extend([reg_max, end2end, [ch[x] for x in f]])
             if m is Segment or m is YOLOESegment or m is Segment26 or m is YOLOESegment26:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
-            if m in {Detect, YOLOEDetect, Segment, Segment26, YOLOESegment, YOLOESegment26, Pose, Pose26, OBB, OBB26}:
+            if m in {Detect, TGADetect, YOLOEDetect, Segment, Segment26, YOLOESegment, YOLOESegment26, Pose, Pose26, OBB, OBB26}:
                 m.legacy = legacy
         elif m is v10Detect:
             args.append([ch[x] for x in f])
