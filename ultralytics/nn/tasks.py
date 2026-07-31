@@ -16,6 +16,7 @@ from ultralytics.nn.Conv.DEGConv_AP import C3k2_DEGConv_AP
 from ultralytics.nn.Conv.DEGConv_DE import C3k2_DEGConv_DE
 from ultralytics.nn.Conv.DEGConv_MH import C3k2_DEGConv_MH
 from ultralytics.nn.Conv.FAAFusion import FAAFusion
+from ultralytics.nn.Conv.DyFusFuse import DyFusFuse
 from ultralytics.nn.Conv.BinaryAttention import C3k2_BinaryAttention
 from ultralytics.nn.Conv.BinaryAttentionV1 import C3k2_BinaryAttentionV1
 from ultralytics.nn.Conv.BinaryAttentionV2 import C3k2_BinaryAttentionV2
@@ -1724,6 +1725,10 @@ def parse_model(d, ch, verbose=True):
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
+        elif m is DyFusFuse:
+            c1 = [ch[x] for x in f]
+            c2 = sum(c1)
+            args = [c1, c2]
         elif m in frozenset(
             {
                 Detect,
