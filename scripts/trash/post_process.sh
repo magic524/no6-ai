@@ -9,18 +9,39 @@ YOLO="/home/magic524/miniconda3/envs/no6-ai/bin/yolo"
 PY="/home/magic524/miniconda3/envs/no6-ai/bin/python"
 EVAL_AP="$CDIR/eval_ap.py"
 NOTION_WRITE="$CDIR/notion_write.py"
-DEVICE=0  # val/eval 统一用 GPU0
+DEVICE=0 # val/eval 统一用 GPU0
 
 # ── 解析参数 ──
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --model) MODEL="$2"; shift 2 ;;
-    --dataset) DATASET="$2"; shift 2 ;;
-    --weight) WEIGHT="$2"; shift 2 ;;
-    --scale) SCALE="$2"; shift 2 ;;
-    --params) PARAMS="$2"; shift 2 ;;
-    --gflops) GFLOPS="$2"; shift 2 ;;
-    *) echo "未知参数: $1"; exit 1 ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --dataset)
+      DATASET="$2"
+      shift 2
+      ;;
+    --weight)
+      WEIGHT="$2"
+      shift 2
+      ;;
+    --scale)
+      SCALE="$2"
+      shift 2
+      ;;
+    --params)
+      PARAMS="$2"
+      shift 2
+      ;;
+    --gflops)
+      GFLOPS="$2"
+      shift 2
+      ;;
+    *)
+      echo "未知参数: $1"
+      exit 1
+      ;;
   esac
 done
 
@@ -34,7 +55,7 @@ declare -A YAMLS
 YAMLS[VisDrone]="VisDrone.yaml"
 YAMLS[TinyPerson]="TinyPerson.yaml"
 YAMLS[RSOD]="RSOD.yaml"
-YAMLS[NWPU_VHR-10]="NWPU_VHR-10.yaml"
+YAMLS[NWPU_VHR - 10]="NWPU_VHR-10.yaml"
 YAML="${YAMLS[$DATASET]}"
 
 # ── GT 文件路径 ──
@@ -42,7 +63,7 @@ declare -A GTS
 GTS[VisDrone]="/mnt/e/Datasets/VisDrone/annotations/instances_val.json"
 GTS[TinyPerson]="/mnt/e/Datasets/Small_Objects_Dataset/TinyPerson/annotations/instances_val.json"
 GTS[RSOD]="/mnt/e/Datasets/RSOD/annotations/instances_val.json"
-GTS[NWPU_VHR-10]="/mnt/e/Datasets/NWPU_VHR-10/annotations/instances_val.json"
+GTS[NWPU_VHR - 10]="/mnt/e/Datasets/NWPU_VHR-10/annotations/instances_val.json"
 GT="${GTS[$DATASET]}"
 
 if [[ -z "$YAML" || -z "$GT" ]]; then

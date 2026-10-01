@@ -15,24 +15,33 @@ echo "Date: $(date)" | tee -a $LOG
 echo "=========================================" | tee -a $LOG
 
 run_eval_fps() {
-    local dataset=$1
-    local scale=$2
-    local pred_dir="$BASE/${dataset}/yolo11${scale}-${MODULE}"
-    local best="$pred_dir/weights/best.pt"
-    local pred_json="$pred_dir/predictions.json"
-    local ann_file="/root/autodl-tmp/datasets/${dataset}/annotations/instances_val.json"
+  local dataset=$1
+  local scale=$2
+  local pred_dir="$BASE/${dataset}/yolo11${scale}-${MODULE}"
+  local best="$pred_dir/weights/best.pt"
+  local pred_json="$pred_dir/predictions.json"
+  local ann_file="/root/autodl-tmp/datasets/${dataset}/annotations/instances_val.json"
 
-    echo "" | tee -a $LOG
-    echo "--- yolo11${scale}-${MODULE} — ${dataset} ---" | tee -a $LOG
+  echo "" | tee -a $LOG
+  echo "--- yolo11${scale}-${MODULE} — ${dataset} ---" | tee -a $LOG
 
-    # Verify files exist
-    [ -f "$best" ] || { echo "SKIP: $best not found" | tee -a $LOG; return; }
-    [ -f "$pred_json" ] || { echo "SKIP: $pred_json not found" | tee -a $LOG; return; }
-    [ -f "$ann_file" ] || { echo "SKIP: $ann_file not found" | tee -a $LOG; return; }
+  # Verify files exist
+  [ -f "$best" ] || {
+    echo "SKIP: $best not found" | tee -a $LOG
+    return
+  }
+  [ -f "$pred_json" ] || {
+    echo "SKIP: $pred_json not found" | tee -a $LOG
+    return
+  }
+  [ -f "$ann_file" ] || {
+    echo "SKIP: $ann_file not found" | tee -a $LOG
+    return
+  }
 
-    # === COCO Eval (direct pycocotools, skip category_id +1 bug) ===
-    echo "--- COCO Eval ---" | tee -a $LOG
-    $PY -c "
+  # === COCO Eval (direct pycocotools, skip category_id +1 bug) ===
+  echo "--- COCO Eval ---" | tee -a $LOG
+  $PY -c "
 import json, sys
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -82,9 +91,9 @@ with open('$pred_dir/val_cocoeval.log', 'w') as f:
     f.write(f'AP_s: {stats[3]:.6f}\nAP_m: {stats[4]:.6f}\nAP_l: {stats[5]:.6f}\n')
 " 2>&1 | tee -a $LOG
 
-    # === FPS ===
-    echo "--- FPS ---" | tee -a $LOG
-    $PY -c "
+  # === FPS ===
+  echo "--- FPS ---" | tee -a $LOG
+  $PY -c "
 import torch, time, sys
 from ultralytics import YOLO
 
@@ -109,14 +118,14 @@ except Exception as e:
 echo "" | tee -a $LOG
 echo "========== RSOD ==========" | tee -a $LOG
 for s in n s m l x; do
-    run_eval_fps "RSOD" "$s"
+  run_eval_fps "RSOD" "$s"
 done
 
 # ===== NWPU_VHR-10 =====
 echo "" | tee -a $LOG
 echo "========== NWPU_VHR-10 ==========" | tee -a $LOG
 for s in n s m l x; do
-    run_eval_fps "NWPU_VHR-10" "$s"
+  run_eval_fps "NWPU_VHR-10" "$s"
 done
 
 echo "" | tee -a $LOG
