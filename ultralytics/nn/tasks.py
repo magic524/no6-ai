@@ -8,22 +8,22 @@ from copy import deepcopy
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ultralytics.nn.autobackend import check_class_names
+from ultralytics.nn.block.AFFN import C2PSA_AFFN
+from ultralytics.nn.block.DMSSP import DMSSP
+from ultralytics.nn.block.WDAM import C2PSA_WDAM
+from ultralytics.nn.Conv.BinaryAttention import C3k2_BinaryAttention
+from ultralytics.nn.Conv.BinaryAttentionV1 import C3k2_BinaryAttentionV1
+from ultralytics.nn.Conv.BinaryAttentionV2 import C3k2_BinaryAttentionV2
 from ultralytics.nn.Conv.DEGConv import C3k2_DEGConv
 from ultralytics.nn.Conv.DEGConv_AP import C3k2_DEGConv_AP
 from ultralytics.nn.Conv.DEGConv_DE import C3k2_DEGConv_DE
 from ultralytics.nn.Conv.DEGConv_MH import C3k2_DEGConv_MH
-from ultralytics.nn.Conv.FAAFusion import FAAFusion
 from ultralytics.nn.Conv.DyFusFuse import DyFusFuse
-from ultralytics.nn.Conv.BinaryAttention import C3k2_BinaryAttention
-from ultralytics.nn.Conv.BinaryAttentionV1 import C3k2_BinaryAttentionV1
-from ultralytics.nn.Conv.BinaryAttentionV2 import C3k2_BinaryAttentionV2
+from ultralytics.nn.Conv.FAAFusion import FAAFusion
 from ultralytics.nn.Conv.IRA import C3k2_IRA
-from ultralytics.nn.block.WDAM import C2PSA_WDAM
-from ultralytics.nn.block.AFFN import C2PSA_AFFN
-from ultralytics.nn.block.DMSSP import DMSSP
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -79,13 +79,13 @@ from ultralytics.nn.modules import (
     SCDown,
     Segment,
     Segment26,
+    TGADetect,
     TorchVision,
     WorldDetect,
     YOLOEDetect,
     YOLOESegment,
     YOLOESegment26,
     v10Detect,
-    TGADetect,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, SETTINGS, WINDOWS, YAML, colorstr, emojis
 from ultralytics.utils.checks import REMOTE_FILE_PREFIXES, check_file, check_requirements, check_suffix, check_yaml
@@ -1391,11 +1391,9 @@ class SafeClass:
 
     def __init__(self, *args, **kwargs):
         """Initialize SafeClass instance, ignoring all arguments."""
-        pass
 
     def __call__(self, *args, **kwargs):
         """Run SafeClass instance, ignoring all arguments."""
-        pass
 
 
 class SafeUnpickler(pickle.Unpickler):
@@ -1748,7 +1746,19 @@ def parse_model(d, ch, verbose=True):
             args.extend([reg_max, end2end, [ch[x] for x in f]])
             if m is Segment or m is YOLOESegment or m is Segment26 or m is YOLOESegment26:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
-            if m in {Detect, TGADetect, YOLOEDetect, Segment, Segment26, YOLOESegment, YOLOESegment26, Pose, Pose26, OBB, OBB26}:
+            if m in {
+                Detect,
+                TGADetect,
+                YOLOEDetect,
+                Segment,
+                Segment26,
+                YOLOESegment,
+                YOLOESegment26,
+                Pose,
+                Pose26,
+                OBB,
+                OBB26,
+            }:
                 m.legacy = legacy
         elif m is v10Detect:
             args.append([ch[x] for x in f])
