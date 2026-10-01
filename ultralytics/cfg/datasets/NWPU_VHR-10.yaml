@@ -1,13 +1,13 @@
 ## Windows Paths
 # path: /mnt/Datasets/Small_Objects_Dataset/NWPU_VHR-10
-# train: images/train 
-# val: images/val 
+# train: images/train
+# val: images/val
 # test: images/test
 
 # Linux Paths
 path: ../../../datasets/NWPU_VHR-10
-train: images/train 
-val: images/val 
+train: images/train
+val: images/val
 test: images/test
 
 # Classes

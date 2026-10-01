@@ -17,9 +17,10 @@ Design:
 Registration: same pattern as FAAFusion (neck fusion, NOT in base_modules/repeat_modules).
   In tasks.py: elif m is DyFusFuse: c1 = [ch[x] for x in f]; c2 = ...
 """
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ultralytics.nn.modules.conv import Conv
 
@@ -27,8 +28,8 @@ from ultralytics.nn.modules.conv import Conv
 class DMSD(nn.Module):
     """Dynamic Multi-resolution Spectral Decomposition.
 
-    Decomposes features into low/mid/high frequency-inspired bands using
-    lightweight spatial operators (no FFT/DWT), with content-adaptive weighting.
+    Decomposes features into low/mid/high frequency-inspired bands using lightweight spatial operators (no FFT/DWT),
+    with content-adaptive weighting.
     """
 
     def __init__(self, channels):
@@ -59,8 +60,7 @@ class DMSD(nn.Module):
 class SFCM(nn.Module):
     """Spatial-Frequency Cooperative Modulation.
 
-    Multi-kernel spatial aggregation (1x1 + DW3x3 + DW5x5) followed by
-    SE-style channel attention.
+    Multi-kernel spatial aggregation (1x1 + DW3x3 + DW5x5) followed by SE-style channel attention.
     """
 
     def __init__(self, channels, reduction=4):
@@ -91,9 +91,8 @@ class SFCM(nn.Module):
 class DyFusFuse(nn.Module):
     """Dynamic Frequency-Spatial Fusion module.
 
-    Replaces Concat in YOLO11 neck with frequency-spatial guided fusion.
-    Takes multiple input feature maps, concatenates them, then applies
-    DMSD + SFCM on a portion of channels.
+    Replaces Concat in YOLO11 neck with frequency-spatial guided fusion. Takes multiple input feature maps, concatenates
+    them, then applies DMSD + SFCM on a portion of channels.
 
     Args:
         in_channels: list of input channel counts (from each feature map)
