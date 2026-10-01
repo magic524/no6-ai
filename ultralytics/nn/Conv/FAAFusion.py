@@ -1,9 +1,10 @@
 ######################################## CVPR2026 FAA by AI Little monster start ########################################
 import math
 from contextlib import nullcontext
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ultralytics.nn.modules.conv import Conv
 
@@ -17,19 +18,19 @@ def _disabled_autocast():
 
 
 class FAAFusion(nn.Module):
-    """Fourier Angle Alignment fusion block.
-    The module aligns the dominant orientation of a high-level feature map to a
-    lower-level feature map in local windows, then fuses the aligned result back
-    into the low-level feature.
+    """Fourier Angle Alignment fusion block. The module aligns the dominant orientation of a high-level feature map to a
+    lower-level feature map in local windows, then fuses the aligned result back into the low-level feature.
+
     Args:
         in_channels: Number of channels in ``x_high`` and ``x_low``.
         m: Local window size used for orientation estimation. Must be odd.
         c_mid: Intermediate projection channel count.
         eps: Small value for numerical stability.
         layer_scale_init_value: Initial value for the learnable fusion scale.
-    Inputs:
+        Inputs:
         x_high: Tensor of shape ``[B, C, H_h, W_h]``.
         x_low: Tensor of shape ``[B, C, H_l, W_l]``.
+
     Returns:
         Tensor of shape ``[B, C, H_l, W_l]``.
     """
@@ -61,15 +62,9 @@ class FAAFusion(nn.Module):
             requires_grad=True,
         )
 
-        self.proj_low = nn.Conv2d(
-            in_channels=out_channels, out_channels=c_mid, kernel_size=1, bias=False
-        )
-        self.proj_high = nn.Conv2d(
-            in_channels=out_channels, out_channels=c_mid, kernel_size=1, bias=False
-        )
-        self.recon = nn.Conv2d(
-            in_channels=c_mid, out_channels=out_channels, kernel_size=1, bias=False
-        )
+        self.proj_low = nn.Conv2d(in_channels=out_channels, out_channels=c_mid, kernel_size=1, bias=False)
+        self.proj_high = nn.Conv2d(in_channels=out_channels, out_channels=c_mid, kernel_size=1, bias=False)
+        self.recon = nn.Conv2d(in_channels=c_mid, out_channels=out_channels, kernel_size=1, bias=False)
 
         self._init_freq_grids(m)
 
@@ -109,9 +104,7 @@ class FAAFusion(nn.Module):
         theta_est = self.valid_thetas.to(device=device, dtype=torch.float32)[max_idx]
         return theta_est
 
-    def _rotate_spatial_patch(
-        self, patch: torch.Tensor, theta: torch.Tensor
-    ) -> torch.Tensor:
+    def _rotate_spatial_patch(self, patch: torch.Tensor, theta: torch.Tensor) -> torch.Tensor:
         batch_windows, _, patch_h, _ = patch.shape
         device = patch.device
 
@@ -124,16 +117,8 @@ class FAAFusion(nn.Module):
         rot_mat[:, 0, 1] = -sin_t
         rot_mat[:, 1, 0] = sin_t
         rot_mat[:, 1, 1] = cos_t
-        rot_mat[:, 0, 2] = (
-            center
-            - cos_t * center
-            + sin_t * center
-        )
-        rot_mat[:, 1, 2] = (
-            center
-            - sin_t * center
-            - cos_t * center
-        )
+        rot_mat[:, 0, 2] = center - cos_t * center + sin_t * center
+        rot_mat[:, 1, 2] = center - sin_t * center - cos_t * center
 
         grid = F.affine_grid(rot_mat, patch.size(), align_corners=False)
         return F.grid_sample(
@@ -144,9 +129,7 @@ class FAAFusion(nn.Module):
             align_corners=False,
         )
 
-    def _build_overlap_norm(
-        self, height: int, width: int, device: torch.device, dtype: torch.dtype
-    ) -> torch.Tensor:
+    def _build_overlap_norm(self, height: int, width: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
         ones = torch.ones(1, 1, height, width, device=device, dtype=dtype)
         ones_unfold = F.unfold(ones, kernel_size=self.m, stride=1, padding=0)
         return F.fold(
@@ -164,17 +147,14 @@ class FAAFusion(nn.Module):
         x_low = self.conv1x1_2(x_low)
 
         if x_high.ndim != 4 or x_low.ndim != 4:
-            raise ValueError(
-                "x_high and x_low must both be 4D tensors shaped [B, C, H, W]"
-            )
+            raise ValueError("x_high and x_low must both be 4D tensors shaped [B, C, H, W]")
 
-        batch_size, channels, height_low, width_low = x_low.shape
-        _, high_channels, height_high, width_high = x_high.shape
+        batch_size, _channels, height_low, width_low = x_low.shape
+        _, _high_channels, height_high, width_high = x_high.shape
 
         if height_low < self.m or width_low < self.m:
             raise ValueError(
-                "x_low spatial size must be at least m x m. "
-                f"Got {(height_low, width_low)} with m={self.m}."
+                f"x_low spatial size must be at least m x m. Got {(height_low, width_low)} with m={self.m}."
             )
 
         if (height_high, width_high) != (height_low, width_low):
@@ -192,9 +172,7 @@ class FAAFusion(nn.Module):
 
         num_windows = (height_low - self.m + 1) * (width_low - self.m + 1)
         xh_aligned_cmid = torch.zeros_like(xh_proj)
-        overlap_norm = self._build_overlap_norm(
-            height_low, width_low, x_low.device, x_low.dtype
-        )
+        overlap_norm = self._build_overlap_norm(height_low, width_low, x_low.device, x_low.dtype)
 
         for channel_idx in range(self.c_mid):
             xl_channel = xl_proj[:, channel_idx : channel_idx + 1]
@@ -203,24 +181,16 @@ class FAAFusion(nn.Module):
             xl_unfold = F.unfold(xl_channel, kernel_size=self.m, stride=1, padding=0)
             xh_unfold = F.unfold(xh_channel, kernel_size=self.m, stride=1, padding=0)
 
-            xl_patches = xl_unfold.transpose(1, 2).reshape(
-                batch_size * num_windows, 1, self.m, self.m
-            )
-            xh_patches = xh_unfold.transpose(1, 2).reshape(
-                batch_size * num_windows, 1, self.m, self.m
-            )
+            xl_patches = xl_unfold.transpose(1, 2).reshape(batch_size * num_windows, 1, self.m, self.m)
+            xh_patches = xh_unfold.transpose(1, 2).reshape(batch_size * num_windows, 1, self.m, self.m)
 
             theta_low = self._estimate_main_direction(xl_patches)
             theta_high = self._estimate_main_direction(xh_patches)
 
-            theta_delta = torch.remainder(theta_low, math.pi) - torch.remainder(
-                theta_high, math.pi
-            )
+            theta_delta = torch.remainder(theta_low, math.pi) - torch.remainder(theta_high, math.pi)
 
             xh_rotated = self._rotate_spatial_patch(xh_patches, theta_delta)
-            xh_rotated_flat = xh_rotated.reshape(batch_size, num_windows, -1).transpose(
-                1, 2
-            )
+            xh_rotated_flat = xh_rotated.reshape(batch_size, num_windows, -1).transpose(1, 2)
             xh_aligned_map = F.fold(
                 xh_rotated_flat,
                 output_size=(height_low, width_low),
@@ -228,11 +198,11 @@ class FAAFusion(nn.Module):
                 stride=1,
                 padding=0,
             )
-            xh_aligned_cmid[:, channel_idx : channel_idx + 1] = (
-                xh_aligned_map / (overlap_norm + self.eps)
-            )
+            xh_aligned_cmid[:, channel_idx : channel_idx + 1] = xh_aligned_map / (overlap_norm + self.eps)
 
         xh_recon = self.recon(xh_aligned_cmid)
         x_high_modulated = self.layer_scale * xh_recon + x_high_up
         return x_low + x_high_modulated
+
+
 ######################################## CVPR2026 FAA by AI Little monster end########################################

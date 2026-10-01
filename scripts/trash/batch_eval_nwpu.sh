@@ -6,18 +6,18 @@ GT=/mnt/e/Datasets/Small_Objects_Dataset/NWPU_VHR-10/annotations/instances_val.j
 BASE=runs/detect/Baseline_Model_Experiment/NWPU_VHR-10
 
 for model in yolo26n yolo26s yolo26m yolo26l yolo26x; do
-    echo "=== VAL: $model ==="
-    conda run -n no6-ai yolo val \
-        model=$BASE/$model/weights/best.pt \
-        data=$DATA device=0 save_json=True \
-        name=val_nwpu_${model}
+  echo "=== VAL: $model ==="
+  conda run -n no6-ai yolo val \
+    model=$BASE/$model/weights/best.pt \
+    data=$DATA device=0 save_json=True \
+    name=val_nwpu_${model}
 
-    VAL_DIR=runs/detect/val_nwpu_${model}
-    echo "=== COCO EVAL: $model ==="
-    /home/magic524/miniconda3/envs/no6-ai/bin/python eval_ap.py \
-        --gt $GT \
-        --pred $VAL_DIR/predictions.json \
-        --output $VAL_DIR/predictions_fixed.json
+  VAL_DIR=runs/detect/val_nwpu_${model}
+  echo "=== COCO EVAL: $model ==="
+  /home/magic524/miniconda3/envs/no6-ai/bin/python eval_ap.py \
+    --gt $GT \
+    --pred $VAL_DIR/predictions.json \
+    --output $VAL_DIR/predictions_fixed.json
 done
 
 echo "=== ALL DONE ==="
