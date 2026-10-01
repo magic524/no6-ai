@@ -5,7 +5,7 @@
 # Purpose: Train BinaryAttentionV2 on TinyPerson for n/s/m/l/x
 # Machine: Cloud 2 (AutoDL 3090, port 10951)
 # Env: no6-ai
-# 
+#
 # V2 vs V1:
 #   1. Ternary Q/K {+1,0,-1} + 自适应阈值 → 保留幅度信息，过滤噪声
 #   2. 混合设计: Attention + DepthwiseConv 并行融合 α

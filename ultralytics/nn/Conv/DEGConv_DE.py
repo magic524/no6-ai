@@ -5,22 +5,23 @@ DEGConv Detail-Enhanced (DE-DEGConv) — dual-path design for small object detec
   Path B (Detail/spatial): Full-resolution 3×3 depthwise conv
   Learnable alpha fusion between the two paths.
 """
+
 import einops
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
+from ultralytics.nn.modules.block import Bottleneck, C3k, C3k2
 from ultralytics.nn.modules.conv import Conv
-from ultralytics.nn.modules.block import Bottleneck, C2f, C3k2, C3k
 
 
 def image2patches(x):
     """Original 2×2 patching (same as base DEGConv)."""
-    b, c, h, w = x.shape
+    _b, _c, h, w = x.shape
     pad_h = (2 - h % 2) % 2
     pad_w = (2 - w % 2) % 2
     if pad_h > 0 or pad_w > 0:
-        x = F.pad(x, (0, pad_w, 0, pad_h), mode='replicate')
+        x = F.pad(x, (0, pad_w, 0, pad_h), mode="replicate")
     x = einops.rearrange(x, "b c (hg h) (wg w) -> (hg wg b) c h w", hg=2, wg=2)
     return x, (pad_h, pad_w)
 
@@ -29,9 +30,13 @@ def patches2image(x, pad_info):
     pad_h, pad_w = pad_info
     x = einops.rearrange(x, "(hg wg b) c h w -> b c (hg h) (wg w)", hg=2, wg=2)
     if pad_h > 0 or pad_w > 0:
-        x = x[:, :, :-pad_h, :-pad_w] if (pad_h > 0 and pad_w > 0) else \
-            x[:, :, :-pad_h, :] if pad_h > 0 else \
-                x[:, :, :, :-pad_w]
+        x = (
+            x[:, :, :-pad_h, :-pad_w]
+            if (pad_h > 0 and pad_w > 0)
+            else x[:, :, :-pad_h, :]
+            if pad_h > 0
+            else x[:, :, :, :-pad_w]
+        )
     return x
 
 
@@ -39,10 +44,12 @@ class EdgeConv(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels, kernel_size=3, bias=True):
         super().__init__()
         self.in_proj = nn.Conv2d(in_channels, mid_channels, 1, bias=bias)
-        self.w_conv = nn.Conv2d(mid_channels, mid_channels, (1, kernel_size),
-                                stride=1, padding=(0, kernel_size // 2), groups=mid_channels)
-        self.h_conv = nn.Conv2d(mid_channels, mid_channels, (kernel_size, 1),
-                                stride=1, padding=(kernel_size // 2, 0), groups=mid_channels)
+        self.w_conv = nn.Conv2d(
+            mid_channels, mid_channels, (1, kernel_size), stride=1, padding=(0, kernel_size // 2), groups=mid_channels
+        )
+        self.h_conv = nn.Conv2d(
+            mid_channels, mid_channels, (kernel_size, 1), stride=1, padding=(kernel_size // 2, 0), groups=mid_channels
+        )
         self.out_proj = nn.Conv2d(mid_channels * 2, out_channels, 1, bias=True)
 
     def forward(self, x):
@@ -54,6 +61,7 @@ class EdgeConv(nn.Module):
 
 class DEGConv_HOGPath(nn.Module):
     """HOG-based texture path (same as original DEGConv)."""
+
     def __init__(self, in_dim, nbins=36, cell_size=(8, 8)):
         super().__init__()
         self.nbins = nbins
@@ -92,10 +100,8 @@ class DEGConv_HOGPath(nn.Module):
         crop_h = h_cells * cell_h
         crop_w = w_cells * cell_w
         dirs_crop = x_mean[:, :, :crop_h, :crop_w].to(dtype=input_dtype)
-        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
-                               dtype=input_dtype, device=device).view(1, 1, 3, 3)
-        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]],
-                               dtype=input_dtype, device=device).view(1, 1, 3, 3)
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=input_dtype, device=device).view(1, 1, 3, 3)
+        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=input_dtype, device=device).view(1, 1, 3, 3)
         dx = F.conv2d(dirs_crop, sobel_x, padding=1)
         dy = F.conv2d(dirs_crop, sobel_y, padding=1)
         gradient_dir = torch.atan2(dy, dx + 1e-8).abs()
@@ -111,7 +117,7 @@ class DEGConv_HOGPath(nn.Module):
         hog_bins = torch.linspace(start, torch.pi - start, self.nbins, dtype=input_dtype, device=device)
         hog_feature = hog_bins[None, None, None, :] * weight
         hog_feature = hog_feature.permute(0, 3, 1, 2)
-        hog_feature = F.interpolate(hog_feature, size=(h, w), mode='nearest')
+        hog_feature = F.interpolate(hog_feature, size=(h, w), mode="nearest")
         return hog_feature
 
     def forward(self, x):
@@ -127,6 +133,7 @@ class DEGConv_HOGPath(nn.Module):
 
 class DEGConv_DE(nn.Module):
     """Detail-Enhanced DEGConv: HOG path + Detail path with learnable fusion."""
+
     def __init__(self, in_dim, out_dim, nbins=36, cell_size=(8, 8)):
         super().__init__()
 
@@ -174,7 +181,7 @@ class DEGConv_DE(nn.Module):
 class Bottleneck_DEGConv_DE(Bottleneck):
     def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
         super().__init__(c1, c2, shortcut, g, k, e)
-        c_ = int(c2 * e)
+        int(c2 * e)
         self.cv1 = DEGConv_DE(c1, c1)
         self.cv2 = DEGConv_DE(c2, c2)
 
@@ -191,4 +198,5 @@ class C3k2_DEGConv_DE(C3k2):
         super().__init__(c1, c2, n, c3k, e, g, shortcut)
         self.m = nn.ModuleList(
             C3k_DEGConv_DE(self.c, self.c, 2, shortcut, g) if c3k else Bottleneck_DEGConv_DE(self.c, self.c, shortcut)
-            for _ in range(n))
+            for _ in range(n)
+        )
