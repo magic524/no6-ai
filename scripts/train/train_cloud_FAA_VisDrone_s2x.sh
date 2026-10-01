@@ -20,28 +20,28 @@ echo "=========================================="
 # s — batch 16
 echo "[1/4] yolo11s-FAAFusion — batch 16"
 $YOLO train model=yolo11s-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=16 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/VisDrone/yolo11s
+  name=FAAFusion/VisDrone/yolo11s
 echo "yolo11s-FAAFusion DONE at $(date)"
 echo ""
 
 # m — batch 8
 echo "[2/4] yolo11m-FAAFusion — batch 8"
 $YOLO train model=yolo11m-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/VisDrone/yolo11m
+  name=FAAFusion/VisDrone/yolo11m
 echo "yolo11m-FAAFusion DONE at $(date)"
 echo ""
 
 # l — batch 8
 echo "[3/4] yolo11l-FAAFusion — batch 8"
 $YOLO train model=yolo11l-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/VisDrone/yolo11l
+  name=FAAFusion/VisDrone/yolo11l
 echo "yolo11l-FAAFusion DONE at $(date)"
 echo ""
 
 # x — batch 4
 echo "[4/4] yolo11x-FAAFusion — batch 4"
 $YOLO train model=yolo11x-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=4 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/VisDrone/yolo11x
+  name=FAAFusion/VisDrone/yolo11x
 echo "yolo11x-FAAFusion DONE at $(date)"
 echo ""
 
