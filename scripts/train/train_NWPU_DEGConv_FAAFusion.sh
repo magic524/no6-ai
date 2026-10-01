@@ -23,28 +23,28 @@ echo "========== DEGConv V3 =========="
 # s — batch 16
 echo "[1/9] yolo11s-DEGConv-full — batch 16"
 $YOLO train model=yolo11s-DEGConv-full.yaml data=$DATA epochs=$EPOCHS batch=16 device=$DEVICE imgsz=$IMSZ \
-    name=DEGConv/NWPU_VHR-10/yolo11s-V3_full
+  name=DEGConv/NWPU_VHR-10/yolo11s-V3_full
 echo "yolo11s-DEGConv DONE at $(date)"
 echo ""
 
 # m — batch 8
 echo "[2/9] yolo11m-DEGConv-full — batch 8"
 $YOLO train model=yolo11m-DEGConv-full.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=DEGConv/NWPU_VHR-10/yolo11m-V3_full
+  name=DEGConv/NWPU_VHR-10/yolo11m-V3_full
 echo "yolo11m-DEGConv DONE at $(date)"
 echo ""
 
 # l — batch 8
 echo "[3/9] yolo11l-DEGConv-full — batch 8"
 $YOLO train model=yolo11l-DEGConv-full.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=DEGConv/NWPU_VHR-10/yolo11l-V3_full
+  name=DEGConv/NWPU_VHR-10/yolo11l-V3_full
 echo "yolo11l-DEGConv DONE at $(date)"
 echo ""
 
 # x — batch 4
 echo "[4/9] yolo11x-DEGConv-full — batch 4"
 $YOLO train model=yolo11x-DEGConv-full.yaml data=$DATA epochs=$EPOCHS batch=4 device=$DEVICE imgsz=$IMSZ \
-    name=DEGConv/NWPU_VHR-10/yolo11x-V3_full
+  name=DEGConv/NWPU_VHR-10/yolo11x-V3_full
 echo "yolo11x-DEGConv DONE at $(date)"
 echo ""
 
@@ -54,35 +54,35 @@ echo "========== FAAFusion =========="
 # n — batch 16
 echo "[5/9] yolo11n-FAAFusion — batch 16"
 $YOLO train model=yolo11n-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=16 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/NWPU_VHR-10/yolo11n-FAAFusion
+  name=FAAFusion/NWPU_VHR-10/yolo11n-FAAFusion
 echo "yolo11n-FAAFusion DONE at $(date)"
 echo ""
 
 # s — batch 16
 echo "[6/9] yolo11s-FAAFusion — batch 16"
 $YOLO train model=yolo11s-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=16 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/NWPU_VHR-10/yolo11s-FAAFusion
+  name=FAAFusion/NWPU_VHR-10/yolo11s-FAAFusion
 echo "yolo11s-FAAFusion DONE at $(date)"
 echo ""
 
 # m — batch 8
 echo "[7/9] yolo11m-FAAFusion — batch 8"
 $YOLO train model=yolo11m-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/NWPU_VHR-10/yolo11m-FAAFusion
+  name=FAAFusion/NWPU_VHR-10/yolo11m-FAAFusion
 echo "yolo11m-FAAFusion DONE at $(date)"
 echo ""
 
 # l — batch 8
 echo "[8/9] yolo11l-FAAFusion — batch 8"
 $YOLO train model=yolo11l-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/NWPU_VHR-10/yolo11l-FAAFusion
+  name=FAAFusion/NWPU_VHR-10/yolo11l-FAAFusion
 echo "yolo11l-FAAFusion DONE at $(date)"
 echo ""
 
 # x — batch 4
 echo "[9/9] yolo11x-FAAFusion — batch 4"
 $YOLO train model=yolo11x-FAAFusion.yaml data=$DATA epochs=$EPOCHS batch=4 device=$DEVICE imgsz=$IMSZ \
-    name=FAAFusion/NWPU_VHR-10/yolo11x-FAAFusion
+  name=FAAFusion/NWPU_VHR-10/yolo11x-FAAFusion
 echo "yolo11x-FAAFusion DONE at $(date)"
 echo ""
 
