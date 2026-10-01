@@ -12,4 +12,4 @@ test: images/test
 
 # Classes
 nc: 3
-names: ['car', 'truck', 'bus']
+names: ["car", "truck", "bus"]
