@@ -10,7 +10,7 @@ train: images/train
 val: images/val
 
 # Class names (15 classes)
-names: 
+names:
   0: small-vehicle
   1: large-vehicle
   2: plane
