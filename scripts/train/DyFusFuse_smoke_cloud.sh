@@ -15,15 +15,15 @@ echo ""
 echo "=== 结果检查 ==="
 csv=runs/detect/$MODULE/RSOD/yolo11n-$MODULE/results.csv
 if [ -f "$csv" ]; then
-    echo "✅ results.csv 存在"
-    echo "--- 最终 epoch ---"
-    tail -1 "$csv"
-    echo "--- Loss 趋势 (epoch box cls dfl) ---"
-    awk -F',' 'NR>1 {print $1, $3, $4, $5}' "$csv"
-    echo "--- mAP ---"
-    awk -F',' 'NR>1 {print "epoch="$1, "mAP50="$8, "mAP50-95="$9}' "$csv"
+  echo "✅ results.csv 存在"
+  echo "--- 最终 epoch ---"
+  tail -1 "$csv"
+  echo "--- Loss 趋势 (epoch box cls dfl) ---"
+  awk -F',' 'NR>1 {print $1, $3, $4, $5}' "$csv"
+  echo "--- mAP ---"
+  awk -F',' 'NR>1 {print "epoch="$1, "mAP50="$8, "mAP50-95="$9}' "$csv"
 else
-    echo "❌ results.csv 不存在 — 训练可能失败"
+  echo "❌ results.csv 不存在 — 训练可能失败"
 fi
 echo ""
 echo "Smoke Test 完成！$(date)"
