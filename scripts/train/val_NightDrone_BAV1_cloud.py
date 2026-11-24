@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Validate BinaryAttentionV1 on NightDrone via YOLO Python API."""
-import sys, os, re, json
+
+import re
+import sys
 from pathlib import Path
 
 # ── config ────────────────────────────────────────────
@@ -22,9 +24,9 @@ for scale in scales:
         if f.is_file():
             f.unlink()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Validating: yolo11{scale}-BinaryAttentionV1 NightDrone")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Step 1 & 3: yolo val (produces predictions.json) + get Params/GFLOPs
     print("[Step 1+3/4] yolo val + Params/GFLOPs ...")
@@ -41,13 +43,14 @@ for scale in scales:
     # or just print and parse
     import io
     from contextlib import redirect_stdout
+
     buf = io.StringIO()
     with redirect_stdout(buf):
         model.info()
     info_str = buf.getvalue()
     gflops = None
     for line in info_str.split("\n"):
-        m = re.search(r'([\d.]+)\s*GFLOPs', line)
+        m = re.search(r"([\d.]+)\s*GFLOPs", line)
         if m:
             gflops = float(m.group(1))
             break
@@ -78,6 +81,7 @@ for scale in scales:
     results_csv = val_dir / "results.csv"
     if results_csv.exists():
         import csv
+
         with open(results_csv) as f:
             rows = list(csv.DictReader(f))
             if rows:
@@ -106,9 +110,9 @@ for scale in scales:
     if pred_json and pred_json.exists():
         print(f"Running eval_ap on {pred_json}")
         import subprocess
+
         result = subprocess.run(
-            [sys.executable, EVAL_AP, "--gt", GT, "--pred", str(pred_json)],
-            capture_output=True, text=True, timeout=600
+            [sys.executable, EVAL_AP, "--gt", GT, "--pred", str(pred_json)], capture_output=True, text=True, timeout=600
         )
         out = result.stdout + result.stderr
         (val_dir / "eval_ap_result.log").write_text(out)
@@ -120,14 +124,20 @@ for scale in scales:
             if len(parts) >= 2:
                 key = parts[0].rstrip(":")
                 if key == "AP_s":
-                    try: AP_S = float(parts[1])
-                    except: pass
+                    try:
+                        AP_S = float(parts[1])
+                    except:
+                        pass
                 elif key == "AP_m":
-                    try: AP_M = float(parts[1])
-                    except: pass
+                    try:
+                        AP_M = float(parts[1])
+                    except:
+                        pass
                 elif key == "AP_l":
-                    try: AP_L = float(parts[1])
-                    except: pass
+                    try:
+                        AP_L = float(parts[1])
+                    except:
+                        pass
     else:
         print("WARNING: predictions.json not found, skipping eval_ap")
 
@@ -144,6 +154,6 @@ GFLOPs={gflops:.1f}
     (val_dir / "summary.txt").write_text(summary)
     print(f"\nSummary:\n{summary}")
 
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 print("ALL VALIDATION COMPLETE!")
-print(f"{'='*60}")
+print(f"{'=' * 60}")

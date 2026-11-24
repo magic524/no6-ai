@@ -20,35 +20,35 @@ echo "=========================================="
 # n — batch 16
 echo "[1/5] yolo11n-C3k2_IRA — batch 16"
 $YOLO train model=yolo11n-C3k2_IRA.yaml data=$DATA epochs=$EPOCHS batch=16 device=$DEVICE imgsz=$IMSZ \
-    name=IRA/TinyPerson/yolo11n
+  name=IRA/TinyPerson/yolo11n
 echo "yolo11n DONE at $(date)"
 echo ""
 
 # s — batch 16
 echo "[2/5] yolo11s-C3k2_IRA — batch 16"
 $YOLO train model=yolo11s-C3k2_IRA.yaml data=$DATA epochs=$EPOCHS batch=16 device=$DEVICE imgsz=$IMSZ \
-    name=IRA/TinyPerson/yolo11s
+  name=IRA/TinyPerson/yolo11s
 echo "yolo11s DONE at $(date)"
 echo ""
 
 # m — batch 8
 echo "[3/5] yolo11m-C3k2_IRA — batch 8"
 $YOLO train model=yolo11m-C3k2_IRA.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=IRA/TinyPerson/yolo11m
+  name=IRA/TinyPerson/yolo11m
 echo "yolo11m DONE at $(date)"
 echo ""
 
 # l — batch 8
 echo "[4/5] yolo11l-C3k2_IRA — batch 8"
 $YOLO train model=yolo11l-C3k2_IRA.yaml data=$DATA epochs=$EPOCHS batch=8 device=$DEVICE imgsz=$IMSZ \
-    name=IRA/TinyPerson/yolo11l
+  name=IRA/TinyPerson/yolo11l
 echo "yolo11l DONE at $(date)"
 echo ""
 
 # x — batch 4
 echo "[5/5] yolo11x-C3k2_IRA — batch 4"
 $YOLO train model=yolo11x-C3k2_IRA.yaml data=$DATA epochs=$EPOCHS batch=4 device=$DEVICE imgsz=$IMSZ \
-    name=IRA/TinyPerson/yolo11x
+  name=IRA/TinyPerson/yolo11x
 echo "yolo11x DONE at $(date)"
 echo ""
 

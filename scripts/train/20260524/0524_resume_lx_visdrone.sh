@@ -2,7 +2,7 @@
 # ============================================================
 # 0524_resume_lx_visdrone.sh
 # Date: 2026-05-24
-# Purpose: 
+# Purpose:
 #   - Resume yolo11l-V3_full (169→200, data=VisDrone.yaml)
 #   - Train yolo11x-V3_full (0→200, batch=4)
 # GPU: 1 (RTX 2080 Ti, 22.5GB)

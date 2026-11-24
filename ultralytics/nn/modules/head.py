@@ -7,8 +7,8 @@ import copy
 import math
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.nn.init import constant_, xavier_uniform_
 
 from ultralytics.utils import NOT_MACOS14
@@ -20,20 +20,25 @@ from .conv import Conv, DWConv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "OBB", "Classify", "Detect", "Pose", "RTDETRDecoder", "Segment", "TGADetect", "YOLOEDetect", "YOLOESegment", "v10Detect"
-
-
-
-
-
-
+__all__ = (
+    "OBB",
+    "Classify",
+    "Detect",
+    "Pose",
+    "RTDETRDecoder",
+    "Segment",
+    "TGADetect",
+    "YOLOEDetect",
+    "YOLOESegment",
+    "v10Detect",
+)
 
 
 class TGADetect(nn.Module):
     """YOLO11 Task-Guided Attention-Decoupled Head (TGADHead).
 
-    Reference: Zuo et al. "TGADHead: An efficient and accurate task-guided attention-decoupled
-    head for single-stage object detection." Knowledge-Based Systems, 2024.
+    Reference: Zuo et al. "TGADHead: An efficient and accurate task-guided attention-decoupled head for single-stage
+    object detection." Knowledge-Based Systems, 2024.
 
     Architecture:
         Input (P3, P4, P5) -> [Convx2 / DWConvx4 per scale] ->
@@ -64,14 +69,13 @@ class TGADetect(nn.Module):
         c2 = max(16, ch[0] // 4, self.reg_max * 4)
         c3 = max(ch[0], min(self.nc, 100))
 
-        self.reg_feat = nn.ModuleList(
-            nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3)) for x in ch
-        )
+        self.reg_feat = nn.ModuleList(nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3)) for x in ch)
         self.cls_feat = nn.ModuleList(
             nn.Sequential(
                 nn.Sequential(DWConv(x, x, 3), Conv(x, c3, 1)),
                 nn.Sequential(DWConv(c3, c3, 3), Conv(c3, c3, 1)),
-            ) for x in ch
+            )
+            for x in ch
         )
 
         self.tim_cls2reg = nn.Conv2d(c3, c2, 1)
@@ -106,7 +110,7 @@ class TGADetect(nn.Module):
 
     @property
     def end2end(self):
-        return getattr(self, '_end2end', False)
+        return getattr(self, "_end2end", False)
 
     @end2end.setter
     def end2end(self, value):
@@ -131,11 +135,11 @@ class TGADetect(nn.Module):
             boxes_list.append(self.reg_pred[i](reg_f).view(bs, 4 * self.reg_max, -1))
             scores_list.append(self.cls_pred[i](cls_f).view(bs, self.nc, -1))
 
-        return dict(
-            boxes=torch.cat(boxes_list, dim=-1),
-            scores=torch.cat(scores_list, dim=-1),
-            feats=x,
-        )
+        return {
+            "boxes": torch.cat(boxes_list, dim=-1),
+            "scores": torch.cat(scores_list, dim=-1),
+            "feats": x,
+        }
 
     def forward(self, x):
         preds = self.forward_head(x)
@@ -145,19 +149,17 @@ class TGADetect(nn.Module):
         return y if self.export else (y, preds)
 
     def _inference(self, x):
-        shape = x['feats'][0].shape
+        shape = x["feats"][0].shape
         if self.dynamic or self.shape != shape:
-            self.anchors, self.strides = (a.transpose(0, 1) for a in make_anchors(x['feats'], self.stride, 0.5))
+            self.anchors, self.strides = (a.transpose(0, 1) for a in make_anchors(x["feats"], self.stride, 0.5))
             self.shape = shape
-        dbox = self.decode_bboxes(self.dfl(x['boxes']), self.anchors.unsqueeze(0)) * self.strides
-        return torch.cat((dbox, x['scores'].sigmoid()), 1)
+        dbox = self.decode_bboxes(self.dfl(x["boxes"]), self.anchors.unsqueeze(0)) * self.strides
+        return torch.cat((dbox, x["scores"].sigmoid()), 1)
 
     def bias_init(self):
         for i in range(self.nl):
             self.reg_pred[i].bias.data[:] = 2.0
-            self.cls_pred[i].bias.data[:self.nc] = math.log(
-                5 / self.nc / (640 / self.stride[i]) ** 2
-            )
+            self.cls_pred[i].bias.data[: self.nc] = math.log(5 / self.nc / (640 / self.stride[i]) ** 2)
 
     def decode_bboxes(self, bboxes, anchors, xywh=True):
         return dist2bbox(bboxes, anchors, xywh=xywh and not self.export, dim=1)
@@ -184,7 +186,6 @@ class TGADetect(nn.Module):
 
     def fuse(self):
         pass
-
 
 
 class Detect(nn.Module):
@@ -279,12 +280,12 @@ class Detect(nn.Module):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for v3/v5/v8/v9/v11 backward compatibility."""
-        return dict(box_head=self.cv2, cls_head=self.cv3)
+        return {"box_head": self.cv2, "cls_head": self.cv3}
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(box_head=self.one2one_cv2, cls_head=self.one2one_cv3)
+        return {"box_head": self.one2one_cv2, "cls_head": self.one2one_cv3}
 
     @property
     def end2end(self):
@@ -301,11 +302,11 @@ class Detect(nn.Module):
     ) -> dict[str, torch.Tensor]:
         """Concatenates and returns predicted bounding boxes and class probabilities."""
         if box_head is None or cls_head is None:  # for fused inference
-            return dict()
+            return {}
         bs = x[0].shape[0]  # batch size
         boxes = torch.cat([box_head[i](x[i]).view(bs, 4 * self.reg_max, -1) for i in range(self.nl)], dim=-1)
         scores = torch.cat([cls_head[i](x[i]).view(bs, self.nc, -1) for i in range(self.nl)], dim=-1)
-        return dict(boxes=boxes, scores=scores, feats=x)
+        return {"boxes": boxes, "scores": scores, "feats": x}
 
     def forward(
         self, x: list[torch.Tensor]
@@ -460,12 +461,12 @@ class Segment(Detect):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for backward compatibility."""
-        return dict(box_head=self.cv2, cls_head=self.cv3, mask_head=self.cv4)
+        return {"box_head": self.cv2, "cls_head": self.cv3, "mask_head": self.cv4}
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(box_head=self.one2one_cv2, cls_head=self.one2one_cv3, mask_head=self.one2one_cv4)
+        return {"box_head": self.one2one_cv2, "cls_head": self.one2one_cv3, "mask_head": self.one2one_cv4}
 
     def forward(self, x: list[torch.Tensor]) -> tuple | list[torch.Tensor] | dict[str, torch.Tensor]:
         """Return model outputs and mask coefficients if training, otherwise return outputs and mask coefficients."""
@@ -620,12 +621,12 @@ class OBB(Detect):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for backward compatibility."""
-        return dict(box_head=self.cv2, cls_head=self.cv3, angle_head=self.cv4)
+        return {"box_head": self.cv2, "cls_head": self.cv3, "angle_head": self.cv4}
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(box_head=self.one2one_cv2, cls_head=self.one2one_cv3, angle_head=self.one2one_cv4)
+        return {"box_head": self.one2one_cv2, "cls_head": self.one2one_cv3, "angle_head": self.one2one_cv4}
 
     def _inference(self, x: dict[str, torch.Tensor]) -> torch.Tensor:
         """Decode predicted bounding boxes and class probabilities, concatenated with rotation angles."""
@@ -751,12 +752,12 @@ class Pose(Detect):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for backward compatibility."""
-        return dict(box_head=self.cv2, cls_head=self.cv3, pose_head=self.cv4)
+        return {"box_head": self.cv2, "cls_head": self.cv3, "pose_head": self.cv4}
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(box_head=self.one2one_cv2, cls_head=self.one2one_cv3, pose_head=self.one2one_cv4)
+        return {"box_head": self.one2one_cv2, "cls_head": self.one2one_cv3, "pose_head": self.one2one_cv4}
 
     def _inference(self, x: dict[str, torch.Tensor]) -> torch.Tensor:
         """Decode predicted bounding boxes and class probabilities, concatenated with keypoints."""
@@ -865,24 +866,24 @@ class Pose26(Pose):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for backward compatibility."""
-        return dict(
-            box_head=self.cv2,
-            cls_head=self.cv3,
-            pose_head=self.cv4,
-            kpts_head=self.cv4_kpts,
-            kpts_sigma_head=self.cv4_sigma,
-        )
+        return {
+            "box_head": self.cv2,
+            "cls_head": self.cv3,
+            "pose_head": self.cv4,
+            "kpts_head": self.cv4_kpts,
+            "kpts_sigma_head": self.cv4_sigma,
+        }
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(
-            box_head=self.one2one_cv2,
-            cls_head=self.one2one_cv3,
-            pose_head=self.one2one_cv4,
-            kpts_head=self.one2one_cv4_kpts,
-            kpts_sigma_head=self.one2one_cv4_sigma,
-        )
+        return {
+            "box_head": self.one2one_cv2,
+            "cls_head": self.one2one_cv3,
+            "pose_head": self.one2one_cv4,
+            "kpts_head": self.one2one_cv4_kpts,
+            "kpts_sigma_head": self.one2one_cv4_sigma,
+        }
 
     def forward_head(
         self,
@@ -1041,7 +1042,7 @@ class WorldDetect(Detect):
         bs = x[0].shape[0]
         x_cat = torch.cat([xi.view(bs, self.no, -1) for xi in x], 2)
         boxes, scores = x_cat.split((self.reg_max * 4, self.nc), 1)
-        preds = dict(boxes=boxes, scores=scores, feats=feats)
+        preds = {"boxes": boxes, "scores": scores, "feats": feats}
         if self.training:
             return preds
         y = self._inference(preds)
@@ -1286,7 +1287,7 @@ class YOLOEDetect(Detect):
             boxes.append(box.view(bs, self.reg_max * 4, -1))
             scores.append(score)
             index.append(idx)
-        preds = dict(boxes=torch.cat(boxes, 2), scores=torch.cat(scores, 2), feats=x, index=torch.cat(index))
+        preds = {"boxes": torch.cat(boxes, 2), "scores": torch.cat(scores, 2), "feats": x, "index": torch.cat(index)}
         y = self._inference(preds)
         if self.end2end:
             y = self.postprocess(y.permute(0, 2, 1))
@@ -1302,18 +1303,18 @@ class YOLOEDetect(Detect):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for v3/v5/v8/v9/v11 backward compatibility."""
-        return dict(box_head=self.cv2, cls_head=self.cv3, contrastive_head=self.cv4)
+        return {"box_head": self.cv2, "cls_head": self.cv3, "contrastive_head": self.cv4}
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(box_head=self.one2one_cv2, cls_head=self.one2one_cv3, contrastive_head=self.one2one_cv4)
+        return {"box_head": self.one2one_cv2, "cls_head": self.one2one_cv3, "contrastive_head": self.one2one_cv4}
 
     def forward_head(self, x, box_head, cls_head, contrastive_head):
         """Concatenates and returns predicted bounding boxes, class probabilities, and contrastive scores."""
         assert len(x) == 4, f"Expected 4 features including 3 feature maps and 1 text embeddings, but got {len(x)}."
         if box_head is None or cls_head is None:  # for fused inference
-            return dict()
+            return {}
         bs = x[0].shape[0]  # batch size
         boxes = torch.cat([box_head[i](x[i]).view(bs, 4 * self.reg_max, -1) for i in range(self.nl)], dim=-1)
         self.nc = x[-1].shape[1]
@@ -1321,7 +1322,7 @@ class YOLOEDetect(Detect):
             [contrastive_head[i](cls_head[i](x[i]), x[-1]).reshape(bs, self.nc, -1) for i in range(self.nl)], dim=-1
         )
         self.no = self.nc + self.reg_max * 4  # self.nc could be changed when inference with different texts
-        return dict(boxes=boxes, scores=scores, feats=x[:3])
+        return {"boxes": boxes, "scores": scores, "feats": x[:3]}
 
     def bias_init(self):
         """Initialize Detect() biases, WARNING: requires stride availability."""
@@ -1399,17 +1400,17 @@ class YOLOESegment(YOLOEDetect):
     @property
     def one2many(self):
         """Returns the one-to-many head components, here for v3/v5/v8/v9/v11 backward compatibility."""
-        return dict(box_head=self.cv2, cls_head=self.cv3, mask_head=self.cv5, contrastive_head=self.cv4)
+        return {"box_head": self.cv2, "cls_head": self.cv3, "mask_head": self.cv5, "contrastive_head": self.cv4}
 
     @property
     def one2one(self):
         """Returns the one-to-one head components."""
-        return dict(
-            box_head=self.one2one_cv2,
-            cls_head=self.one2one_cv3,
-            mask_head=self.one2one_cv5,
-            contrastive_head=self.one2one_cv4,
-        )
+        return {
+            "box_head": self.one2one_cv2,
+            "cls_head": self.one2one_cv3,
+            "mask_head": self.one2one_cv5,
+            "contrastive_head": self.one2one_cv4,
+        }
 
     def forward_lrpc(self, x: list[torch.Tensor]) -> torch.Tensor | tuple:
         """Process features with fused text embeddings to generate detections for prompt-free model."""
@@ -1432,13 +1433,13 @@ class YOLOESegment(YOLOEDetect):
             index.append(idx)
         mc = torch.cat([cv5[i](x[i]).view(bs, self.nm, -1) for i in range(self.nl)], 2)
         index = torch.cat(index)
-        preds = dict(
-            boxes=torch.cat(boxes, 2),
-            scores=torch.cat(scores, 2),
-            feats=x,
-            index=index,
-            mask_coefficient=mc * index.int() if self.export and not self.dynamic else mc[..., index],
-        )
+        preds = {
+            "boxes": torch.cat(boxes, 2),
+            "scores": torch.cat(scores, 2),
+            "feats": x,
+            "index": index,
+            "mask_coefficient": mc * index.int() if self.export and not self.dynamic else mc[..., index],
+        }
         y = self._inference(preds)
         if self.end2end:
             y = self.postprocess(y.permute(0, 2, 1))

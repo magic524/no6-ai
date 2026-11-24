@@ -1,7 +1,7 @@
 ######################################## IEEE Transactions on Geoscience and Remote Sensing  DMSSP  by AI Little monster start   ########################################
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ultralytics.nn.modules.conv import Conv
 
@@ -105,14 +105,13 @@ class DMSSP(nn.Module):
         x_s = image_features + self.belt * image_features2
 
         x_6 = self.atrous_block6(x[:, : self.embed_dims_2, ...])
-        x_12 = self.atrous_block12(
-            x[:, self.embed_dims_2 : self.embed_dims_2 + self.embed_dims_1, ...]
-        )
+        x_12 = self.atrous_block12(x[:, self.embed_dims_2 : self.embed_dims_2 + self.embed_dims_1, ...])
         x_18 = self.atrous_block18(x[:, self.embed_dims - self.embed_dims_0 :, ...])
 
         x = self.PW_conv(torch.cat([x_6, x_12, x_18], dim=1))
         x = x + x_s
 
         return self.proj(x)
+
 
 ######################################## IEEE Transactions on Geoscience and Remote Sensing  DMSSP  by AI Little monster end   ########################################

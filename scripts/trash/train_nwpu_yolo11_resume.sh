@@ -11,15 +11,15 @@ $YOLO detect train resume model=runs/detect/Baseline_Model_Experiment/NWPU_VHR-1
 echo "=== yolo11x COMPLETE ==="
 
 for model in yolo11l yolo11m yolo11s yolo11n; do
-    case $model in
-        yolo11l|yolo11m) BATCH=8 ;;
-        yolo11s|yolo11n) BATCH=16 ;;
-    esac
-    echo "=========================================="
-    echo "=== START: $model (batch=$BATCH, device=0) ==="
-    echo "=========================================="
-    $YOLO detect train data=NWPU_VHR-10.yaml model=${model}.yaml batch=$BATCH device=0 name="Baseline_Model_Experiment/NWPU_VHR-10/$model"
-    echo "=== $model COMPLETE ==="
+  case $model in
+    yolo11l | yolo11m) BATCH=8 ;;
+    yolo11s | yolo11n) BATCH=16 ;;
+  esac
+  echo "=========================================="
+  echo "=== START: $model (batch=$BATCH, device=0) ==="
+  echo "=========================================="
+  $YOLO detect train data=NWPU_VHR-10.yaml model=${model}.yaml batch=$BATCH device=0 name="Baseline_Model_Experiment/NWPU_VHR-10/$model"
+  echo "=== $model COMPLETE ==="
 done
 
 echo ""

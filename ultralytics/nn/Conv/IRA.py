@@ -1,11 +1,11 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class AttentionBlock(nn.Module):
     def __init__(self, dim: int):
-        super(AttentionBlock, self).__init__()
+        super().__init__()
         self._spatial_attention_conv = nn.Conv2d(2, dim, kernel_size=3, padding=1)
         # Channel attention MLP
         self._channel_attention_conv0 = nn.Conv2d(1, dim, kernel_size=1, padding=0)
@@ -35,7 +35,7 @@ class AttentionBlock(nn.Module):
 
 class BaseBlock(nn.Module):
     def __init__(self, channels: int):
-        super(BaseBlock, self).__init__()
+        super().__init__()
         self._conv0 = nn.Conv2d(channels, channels, kernel_size=1)
         self._dw_conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1, groups=channels)
         self._conv1 = nn.Conv2d(channels, channels, kernel_size=1)

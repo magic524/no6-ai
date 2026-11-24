@@ -9,14 +9,14 @@ for i in "${!EXPS[@]}"; do
   exp=${EXPS[$i]}
   dir=${EXPS_DIR[$i]}
   echo "=== Val: $exp ==="
-  
+
   CUDA_VISIBLE_DEVICES=0 /home/magic524/miniconda3/bin/conda run -n ultralytics-no5 \
     yolo detect val \
     data=$DATA \
     model=runs/detect/DEGConv_ablation/NWPU_VHR-10/$dir/weights/best.pt \
     batch=16 imgsz=640 save_json \
     name="val_NW_${exp}" project="runs/tmp_val_nw" 2>&1 | tail -3
-  
+
   # Copy predictions to experiment dir
   SRC=runs/tmp_val_nw/val_NW_${exp}/predictions.json
   DST=runs/detect/DEGConv_ablation/NWPU_VHR-10/$dir/predictions.json

@@ -24,13 +24,10 @@ test: images/test # test images (relative to 'path')
 # Classes
 names:
   0: car
-  1: truck 
-  2: motor 
-  3: pedestrian 
+  1: truck
+  2: motor
+  3: pedestrian
   4: van
-  5: tricycle 
-  6: people 
-  7: bus 
- 
-  
-
+  5: tricycle
+  6: people
+  7: bus

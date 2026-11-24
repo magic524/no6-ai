@@ -6,24 +6,25 @@ DEGConv Multi-Head (MH-DEGConv) — parallel multi-scale patch heads for small o
   Head 3 (3×3): Larger context
   Learned softmax fusion weights per channel.
 """
+
 import einops
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
+from ultralytics.nn.modules.block import Bottleneck, C3k, C3k2
 from ultralytics.nn.modules.conv import Conv
-from ultralytics.nn.modules.block import Bottleneck, C2f, C3k2, C3k
 
 
 def image2patches_ps(x, patch_size):
     """Patch with arbitrary patch_size. Returns patched x and pad_info."""
     if patch_size == 1:
         return x, (0, 0)
-    b, c, h, w = x.shape
+    _b, _c, h, w = x.shape
     pad_h = (patch_size - h % patch_size) % patch_size
     pad_w = (patch_size - w % patch_size) % patch_size
     if pad_h > 0 or pad_w > 0:
-        x = F.pad(x, (0, pad_w, 0, pad_h), mode='replicate')
+        x = F.pad(x, (0, pad_w, 0, pad_h), mode="replicate")
     x = einops.rearrange(x, "b c (hg h) (wg w) -> (hg wg b) c h w", hg=patch_size, wg=patch_size)
     return x, (pad_h, pad_w)
 
@@ -35,9 +36,13 @@ def patches2image_ps(x, pad_info, patch_size):
     pad_h, pad_w = pad_info
     x = einops.rearrange(x, "(hg wg b) c h w -> b c (hg h) (wg w)", hg=patch_size, wg=patch_size)
     if pad_h > 0 or pad_w > 0:
-        x = x[:, :, :-pad_h, :-pad_w] if (pad_h > 0 and pad_w > 0) else \
-            x[:, :, :-pad_h, :] if pad_h > 0 else \
-                x[:, :, :, :-pad_w]
+        x = (
+            x[:, :, :-pad_h, :-pad_w]
+            if (pad_h > 0 and pad_w > 0)
+            else x[:, :, :-pad_h, :]
+            if pad_h > 0
+            else x[:, :, :, :-pad_w]
+        )
     return x
 
 
@@ -45,10 +50,12 @@ class EdgeConv(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels, kernel_size=3, bias=True):
         super().__init__()
         self.in_proj = nn.Conv2d(in_channels, mid_channels, 1, bias=bias)
-        self.w_conv = nn.Conv2d(mid_channels, mid_channels, (1, kernel_size),
-                                stride=1, padding=(0, kernel_size // 2), groups=mid_channels)
-        self.h_conv = nn.Conv2d(mid_channels, mid_channels, (kernel_size, 1),
-                                stride=1, padding=(kernel_size // 2, 0), groups=mid_channels)
+        self.w_conv = nn.Conv2d(
+            mid_channels, mid_channels, (1, kernel_size), stride=1, padding=(0, kernel_size // 2), groups=mid_channels
+        )
+        self.h_conv = nn.Conv2d(
+            mid_channels, mid_channels, (kernel_size, 1), stride=1, padding=(kernel_size // 2, 0), groups=mid_channels
+        )
         self.out_proj = nn.Conv2d(mid_channels * 2, out_channels, 1, bias=True)
 
     def forward(self, x):
@@ -70,6 +77,7 @@ def _safe_gn(num_channels):
 
 class DEGConv_SingleHead(nn.Module):
     """Single DEGConv head with configurable patch_size."""
+
     def __init__(self, in_dim, mid_dim, nbins=36, patch_size=2, cell_size=(8, 8)):
         super().__init__()
         self.patch_size = patch_size
@@ -108,10 +116,8 @@ class DEGConv_SingleHead(nn.Module):
         crop_h = h_cells * cell_h
         crop_w = w_cells * cell_w
         dirs_crop = x_mean[:, :, :crop_h, :crop_w].to(dtype=input_dtype)
-        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
-                               dtype=input_dtype, device=device).view(1, 1, 3, 3)
-        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]],
-                               dtype=input_dtype, device=device).view(1, 1, 3, 3)
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=input_dtype, device=device).view(1, 1, 3, 3)
+        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=input_dtype, device=device).view(1, 1, 3, 3)
         dx = F.conv2d(dirs_crop, sobel_x, padding=1)
         dy = F.conv2d(dirs_crop, sobel_y, padding=1)
         gradient_dir = torch.atan2(dy, dx + 1e-8).abs()
@@ -127,12 +133,12 @@ class DEGConv_SingleHead(nn.Module):
         hog_bins = torch.linspace(start, torch.pi - start, self.nbins, dtype=input_dtype, device=device)
         hog_feature = hog_bins[None, None, None, :] * weight
         hog_feature = hog_feature.permute(0, 3, 1, 2)
-        hog_feature = F.interpolate(hog_feature, size=(h, w), mode='nearest')
+        hog_feature = F.interpolate(hog_feature, size=(h, w), mode="nearest")
         return hog_feature
 
     def forward(self, x):
         input_dtype = x.dtype
-        b, c, h, w = x.shape
+        _b, _c, _h, _w = x.shape
 
         # Patch
         x_patched, pad_info = image2patches_ps(x, self.patch_size)
@@ -152,16 +158,14 @@ class DEGConv_SingleHead(nn.Module):
 
 class DEGConv_MH(nn.Module):
     """Multi-Head DEGConv: 3 parallel patch scales with learned fusion."""
+
     def __init__(self, in_dim, out_dim, nbins=36, cell_size=(8, 8)):
         super().__init__()
         # Compress mid_dim to control parameter count
         mid_dim = max(16, in_dim // 3)
 
         # 3 heads with different patch sizes
-        self.heads = nn.ModuleList([
-            DEGConv_SingleHead(in_dim, mid_dim, nbins, ps, cell_size)
-            for ps in [1, 2, 3]
-        ])
+        self.heads = nn.ModuleList([DEGConv_SingleHead(in_dim, mid_dim, nbins, ps, cell_size) for ps in [1, 2, 3]])
 
         # Learned channel-wise fusion weights
         self.fusion_proj = nn.Sequential(
@@ -185,13 +189,13 @@ class DEGConv_MH(nn.Module):
 
         # Parallel heads
         outputs = [h(x) for h in self.heads]  # 3 x (B, C, H, W)
-        concat = torch.cat(outputs, dim=1)    # (B, 3C, H, W)
+        concat = torch.cat(outputs, dim=1)  # (B, 3C, H, W)
 
         # Channel-wise fusion weights
-        weights = self.fusion_proj(concat)    # (B, C, H, W) softmax over C dim
+        weights = self.fusion_proj(concat)  # (B, C, H, W) softmax over C dim
 
         # Weighted sum
-        fused = sum(weights[:, i:i+1] * outputs[i] for i in range(3))
+        fused = sum(weights[:, i : i + 1] * outputs[i] for i in range(3))
 
         # Residual + fuse
         out = residual + self.fuse_block(fused)
@@ -201,7 +205,7 @@ class DEGConv_MH(nn.Module):
 class Bottleneck_DEGConv_MH(Bottleneck):
     def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
         super().__init__(c1, c2, shortcut, g, k, e)
-        c_ = int(c2 * e)
+        int(c2 * e)
         self.cv1 = DEGConv_MH(c1, c1)
         self.cv2 = DEGConv_MH(c2, c2)
 
@@ -218,4 +222,5 @@ class C3k2_DEGConv_MH(C3k2):
         super().__init__(c1, c2, n, c3k, e, g, shortcut)
         self.m = nn.ModuleList(
             C3k_DEGConv_MH(self.c, self.c, 2, shortcut, g) if c3k else Bottleneck_DEGConv_MH(self.c, self.c, shortcut)
-            for _ in range(n))
+            for _ in range(n)
+        )

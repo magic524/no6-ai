@@ -1,7 +1,7 @@
 ######################################## CVPR2026 WDAM   by AI Little monster start ########################################
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class WDAM(nn.Module):
@@ -20,38 +20,37 @@ class WDAM(nn.Module):
 
         # 高频分支
         self.high_conv = nn.Sequential(
-            nn.Conv2d(dim*2, dim*2, 3, padding=1, groups=2, bias=bias),
+            nn.Conv2d(dim * 2, dim * 2, 3, padding=1, groups=2, bias=bias),
             nn.ReLU(inplace=True),
-            nn.Conv2d(dim*2, dim, 1, bias=bias),
-            nn.ReLU(inplace=True)
+            nn.Conv2d(dim * 2, dim, 1, bias=bias),
+            nn.ReLU(inplace=True),
         )
         self.high_out = nn.Sequential(
-            nn.Conv2d(dim*3, dim*3, 3, padding=1, groups=3, bias=bias),
-            nn.ReLU(inplace=True)
+            nn.Conv2d(dim * 3, dim * 3, 3, padding=1, groups=3, bias=bias), nn.ReLU(inplace=True)
         )
         # 低频注意力QKV
-        self.qkv = nn.Conv2d(dim, dim*3, 1, bias=bias)
-        self.qkv_dwconv = nn.Conv2d(dim*3, dim*3, 3, padding=1, groups=dim*3, bias=bias)
+        self.qkv = nn.Conv2d(dim, dim * 3, 1, bias=bias)
+        self.qkv_dwconv = nn.Conv2d(dim * 3, dim * 3, 3, padding=1, groups=dim * 3, bias=bias)
         self.project_out = nn.Conv2d(dim, dim, 1, bias=bias)
         # 相对位置偏置
         self.relative_position_bias_table = nn.Parameter(
-            torch.zeros((2*window_size-1)*(2*window_size-1), num_heads)
+            torch.zeros((2 * window_size - 1) * (2 * window_size - 1), num_heads)
         )
-        coords = torch.stack(torch.meshgrid(torch.arange(window_size), torch.arange(window_size), indexing='ij'))
+        coords = torch.stack(torch.meshgrid(torch.arange(window_size), torch.arange(window_size), indexing="ij"))
         coords_flatten = coords.flatten(1)
         relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]
         relative_coords = relative_coords.permute(1, 2, 0).contiguous()
         relative_coords[:, :, 0] += window_size - 1
         relative_coords[:, :, 1] += window_size - 1
-        relative_coords[:, :, 0] *= 2*window_size - 1
+        relative_coords[:, :, 0] *= 2 * window_size - 1
         relative_position_index = relative_coords.sum(-1)
         self.register_buffer("relative_position_index", relative_position_index)
 
     def _init_wavelet_filters(self):
         """Haar wavelet filters as buffers (not parameters) for AMP-safe DWT/IDWT."""
         # Haar: low=[1,1]/sqrt(2), high=[1,-1]/sqrt(2) -- orthogonal
-        h0 = torch.tensor([1.0, 1.0]) / (2 ** 0.5)  # low-pass
-        h1 = torch.tensor([1.0, -1.0]) / (2 ** 0.5)  # high-pass
+        h0 = torch.tensor([1.0, 1.0]) / (2**0.5)  # low-pass
+        h1 = torch.tensor([1.0, -1.0]) / (2**0.5)  # high-pass
 
         # 2D separable filters (outer product)
         ll = (h0[:, None] * h0[None, :]).view(1, 1, 2, 2)  # LL
@@ -60,16 +59,16 @@ class WDAM(nn.Module):
         hh = (h1[:, None] * h1[None, :]).view(1, 1, 2, 2)  # HH
 
         # DWT filters (same as forward)
-        self.register_buffer('dwt_ll', ll)
-        self.register_buffer('dwt_lh', lh)
-        self.register_buffer('dwt_hl', hl)
-        self.register_buffer('dwt_hh', hh)
+        self.register_buffer("dwt_ll", ll)
+        self.register_buffer("dwt_lh", lh)
+        self.register_buffer("dwt_hl", hl)
+        self.register_buffer("dwt_hh", hh)
 
         # IDWT filters (same kernels for orthogonal Haar)
-        self.register_buffer('idwt_ll', ll)
-        self.register_buffer('idwt_lh', lh)
-        self.register_buffer('idwt_hl', hl)
-        self.register_buffer('idwt_hh', hh)
+        self.register_buffer("idwt_ll", ll)
+        self.register_buffer("idwt_lh", lh)
+        self.register_buffer("idwt_hl", hl)
+        self.register_buffer("idwt_hh", hh)
 
     def _dwt(self, x):
         """Haar 2D DWT via F.conv2d -- fully AMP compatible."""
@@ -100,12 +99,12 @@ class WDAM(nn.Module):
         return x
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        _B, _C, H, W = x.shape
         # ========== 修复1：DWT强制输入为偶数尺寸，补齐原图 ==========
         pad_hw = 0
         if H % 2 != 0 or W % 2 != 0:
             pad_hw = 1
-            x_pad = F.pad(x, (0, W%2, 0, H%2), mode='constant', value=0)
+            x_pad = F.pad(x, (0, W % 2, 0, H % 2), mode="constant", value=0)
         else:
             x_pad = x
         # DWT分解
@@ -123,9 +122,9 @@ class WDAM(nn.Module):
         win_v, _, _, _, _ = self.window_partition(v)
         B_win, Cq, ws, _ = win_q.shape
         hd = Cq // self.num_heads
-        q = win_q.view(B_win, self.num_heads, hd, ws*ws)
-        k = win_k.view(B_win, self.num_heads, hd, ws*ws)
-        v = win_v.view(B_win, self.num_heads, hd, ws*ws)
+        q = win_q.view(B_win, self.num_heads, hd, ws * ws)
+        k = win_k.view(B_win, self.num_heads, hd, ws * ws)
+        v = win_v.view(B_win, self.num_heads, hd, ws * ws)
         attn_out = self.window_attn(q, k, v)
         attn_out = attn_out.view(B_win, Cq, ws, ws)
         ll_out = self.window_reverse(attn_out, pad_h, pad_w, llH, llW)
@@ -146,9 +145,9 @@ class WDAM(nn.Module):
         pad_h = (ws - H % ws) % ws
         pad_w = (ws - W % ws) % ws
         if pad_h > 0 or pad_w > 0:
-            x = F.pad(x, (0, pad_w, 0, pad_h), mode='constant', value=0)
+            x = F.pad(x, (0, pad_w, 0, pad_h), mode="constant", value=0)
         newH, newW = H + pad_h, W + pad_w
-        x = x.view(B, C, newH//ws, ws, newW//ws, ws)
+        x = x.view(B, C, newH // ws, ws, newW // ws, ws)
         x = x.permute(0, 2, 4, 1, 3, 5).contiguous()
         windows = x.view(-1, C, ws, ws)
         return windows, pad_h, pad_w, H, W
@@ -159,7 +158,7 @@ class WDAM(nn.Module):
         newW = oriW + pad_w
         B = windows.shape[0] // ((newH // ws) * (newW // ws))
         C = windows.shape[1]
-        x = windows.view(B, newH//ws, newW//ws, C, ws, ws)
+        x = windows.view(B, newH // ws, newW // ws, C, ws, ws)
         x = x.permute(0, 3, 1, 4, 2, 5).contiguous()
         x = x.view(B, C, newH, newW)
         if pad_h or pad_w:
@@ -205,4 +204,6 @@ class C2PSA_WDAM(nn.Module):
         a, b = self.cv1(x).split((self.c, self.c), dim=1)
         b = self.m(b)
         return self.cv2(torch.cat((a, b), 1))
+
+
 ######################################## CVPR2026 WDAM   by AI Little monster end ########################################
