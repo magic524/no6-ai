@@ -1,6 +1,6 @@
 ######################################## BinaryAttention V2 — Hybrid ternary attention + local conv ########################################
 """
-Binary Attention V2 — 针对 TinyPerson 小目标稀疏场景优化。
+Binary Attention V2 — 针对 TinyPerson 小目标稀疏场景优化。.
 
 V1 的问题：
   1. 1-bit Q/K ({+1, -1}) 丢失所有幅度信息 → 小目标信号被噪声淹没
@@ -19,14 +19,15 @@ V2.1 (2026-06-15) — STE 梯度修复：
   3. 渐进式量化 warmup: 先全精度训练，逐步引入量化
   4. 梯度裁剪 + EMA NaN 检测
 """
+
+from typing import Any
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.autograd import Function
-from typing import Any, Optional
 
 from ultralytics.nn.modules.block import C3k, C3k2
-
 
 # ── Quantization ops ─────────────────────────────────────────────────
 
@@ -34,9 +35,8 @@ from ultralytics.nn.modules.block import C3k, C3k2
 class TernarySTEFunction(Function):
     """Ternary quantization with STE gradient: {-1, 0, +1} with adaptive threshold.
 
-    V2.1 fix: widened gradient window + gradient floor to prevent EMA NaN at large scales.
-    The original hard clamp at |x| > 2*threshold cuts ALL gradient → weight stagnation.
-    Now uses sigmoid taper that never fully saturates to 0.
+    V2.1 fix: widened gradient window + gradient floor to prevent EMA NaN at large scales. The original hard clamp at
+    |x| > 2*threshold cuts ALL gradient → weight stagnation. Now uses sigmoid taper that never fully saturates to 0.
     """
 
     GRAD_MIN = 0.02  # minimum gradient floor — prevents complete starvation
@@ -54,7 +54,7 @@ class TernarySTEFunction(Function):
 
     @staticmethod
     def backward(ctx: Any, grad_output: torch.Tensor) -> tuple:
-        x, = ctx.saved_tensors
+        (x,) = ctx.saved_tensors
         threshold = ctx.threshold
         # Soft gradient: sigmoid(-3(x_norm-1)) transitions smoothly around |x|=2*threshold
         # Never fully zeros — stays at GRAD_MIN for |x| >> 4*threshold
@@ -77,10 +77,7 @@ class SymQuantizer(Function):
             max_input = torch.max(torch.abs(input)).expand_as(input).detach()
         else:
             assert input.ndimension() == 4, f"Expected 4D input, got {input.shape}"
-            max_input = (
-                torch.max(torch.abs(input), dim=-2, keepdim=True)[0]
-                .expand_as(input).detach()
-            )
+            max_input = torch.max(torch.abs(input), dim=-2, keepdim=True)[0].expand_as(input).detach()
         s = (2 ** (num_bits - 1) - 1) / (max_input + 1e-6)
         output = torch.round(input * s).div(s + 1e-6)
         return output
@@ -100,17 +97,26 @@ class AttentionV2(nn.Module):
     """Multi-head self-attention with ternary Q/K quantization + hybrid local conv fusion.
 
     Key differences from V1:
-      - Ternary Q/K {-1, 0, +1} with adaptive threshold (vs binary {-1, +1})
-      - Hybrid local conv path for local inductive bias
-      - Progressive quantization strength controlled externally
+    - Ternary Q/K {-1, 0, +1} with adaptive threshold (vs binary {-1, +1})
+    - Hybrid local conv path for local inductive bias
+    - Progressive quantization strength controlled externally
     """
 
-    def __init__(self, dim, num_heads=2, qkv_bias=False, attn_drop=0., proj_drop=0.,
-                 qk_ternary=True, pv_quant=True, use_local=True):
+    def __init__(
+        self,
+        dim,
+        num_heads=2,
+        qkv_bias=False,
+        attn_drop=0.0,
+        proj_drop=0.0,
+        qk_ternary=True,
+        pv_quant=True,
+        use_local=True,
+    ):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = head_dim ** -0.5
+        self.scale = head_dim**-0.5
         self.dim = dim
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -134,7 +140,7 @@ class AttentionV2(nn.Module):
         if quant_strength < 1e-6:
             return x  # no quantization during warmup
         # Adaptive threshold: 0.5 * mean_abs per token (learnable scale)
-        abs_mean = x.abs().mean(dim=-1, keepdim=True)  # (B, H, N, 1)
+        x.abs().mean(dim=-1, keepdim=True)  # (B, H, N, 1)
         # Linear interpolation between no-quant and full-quant during warmup
         if quant_strength < 1.0:
             # Blended: x_quant * strength + x * (1 - strength)
@@ -147,10 +153,10 @@ class AttentionV2(nn.Module):
         orig_dtype = x.dtype
         B, N, C = x.shape
         # For local conv, we need spatial dims; compute if 4D input was provided
-        H = int(N ** 0.5)
+        H = int(N**0.5)
         W = H
         # Verify N is a perfect square (for conv compatibility)
-        is_square = (H * W == N)
+        (H * W == N)
 
         # QKV projection
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
@@ -207,16 +213,22 @@ class BinaryAttentionBlockV2(nn.Module):
     Supports progressive quantization via quant_strength (0=no quant → 1=full quant).
     """
 
-    def __init__(self, dim, num_heads=2, qkv_bias=False, drop=0., attn_drop=0.,
-                 qk_ternary=True, pv_quant=True, use_local=True):
+    def __init__(
+        self, dim, num_heads=2, qkv_bias=False, drop=0.0, attn_drop=0.0, qk_ternary=True, pv_quant=True, use_local=True
+    ):
         super().__init__()
         self.dim = dim
         self.quant_strength = 1.0  # default: full quantization
         self.norm1 = nn.LayerNorm(dim)
         self.attn = AttentionV2(
-            dim, num_heads=num_heads, qkv_bias=qkv_bias,
-            attn_drop=attn_drop, proj_drop=drop,
-            qk_ternary=qk_ternary, pv_quant=pv_quant, use_local=use_local,
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            attn_drop=attn_drop,
+            proj_drop=drop,
+            qk_ternary=qk_ternary,
+            pv_quant=pv_quant,
+            use_local=use_local,
         )
 
     def forward(self, x, quant_strength=1.0):
@@ -257,11 +269,14 @@ class C3k2_BinaryAttentionV2(C3k2):
     def __init__(self, c1, c2, n=1, c3k=False, e=0.5, attn=False, g=1, shortcut=True):
         super().__init__(c1, c2, n, c3k, e, attn, g, shortcut)
         c_ = int(c2 * e)
-        self.m = nn.ModuleList([
-            C3k_BinaryAttentionV2(c_, c_, 2, shortcut, g) if c3k or attn
-            else BinaryAttentionBlockV2(c_, num_heads=2)
-            for _ in range(n)
-        ])
+        self.m = nn.ModuleList(
+            [
+                C3k_BinaryAttentionV2(c_, c_, 2, shortcut, g)
+                if c3k or attn
+                else BinaryAttentionBlockV2(c_, num_heads=2)
+                for _ in range(n)
+            ]
+        )
 
     def get_attn_blocks(self):
         """Recursively collect all BinaryAttentionBlockV2 modules."""
@@ -273,7 +288,7 @@ class C3k2_BinaryAttentionV2(C3k2):
 
     def set_quant_strength(self, strength):
         """Set quantization strength for all child BinaryAttentionBlockV2 modules.
-        
+
         Args:
             strength: float in [0, 1], 0 = no quantization, 1 = full quantization.
         """

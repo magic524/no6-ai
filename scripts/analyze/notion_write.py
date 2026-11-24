@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """no6-ai Notion helper — write experiment results to the Baseline database."""
-import json, os, sys, urllib.request, urllib.error
 
+import json
+import sys
+import urllib.error
+import urllib.request
 from pathlib import Path as _Path
+
 _env = {}
 _env_file = _Path(__file__).resolve().parent.parent.parent / ".hermes" / ".env"
 if _env_file.exists():
@@ -67,15 +71,20 @@ def write_experiment(name, model, scale, dataset, map50, map50_95, ap_s, ap_m, a
         _req("PATCH", f"/pages/{page_id}", {"properties": {k: v for k, v in properties.items() if k != "实验名称"}})
         print(f"Updated: {name}")
     else:
-        result = _req("POST", "/pages", {
-            "parent": {"data_source_id": DATA_SOURCE_ID},
-            "properties": properties,
-        })
+        result = _req(
+            "POST",
+            "/pages",
+            {
+                "parent": {"data_source_id": DATA_SOURCE_ID},
+                "properties": properties,
+            },
+        )
         print(f"Created: {result.get('url', '?')}")
 
 
 if __name__ == "__main__":
     import argparse
+
     p = argparse.ArgumentParser()
     p.add_argument("--name", required=True)
     p.add_argument("--model", required=True)
@@ -90,5 +99,17 @@ if __name__ == "__main__":
     p.add_argument("--params", type=float, required=True)
     p.add_argument("--gflops", type=float, required=True)
     args = p.parse_args()
-    write_experiment(args.name, args.model, args.scale, args.dataset, args.map50, args.map50_95,
-                     args.ap_s, args.ap_m, args.ap_l, args.fps, args.params, args.gflops)
+    write_experiment(
+        args.name,
+        args.model,
+        args.scale,
+        args.dataset,
+        args.map50,
+        args.map50_95,
+        args.ap_s,
+        args.ap_m,
+        args.ap_l,
+        args.fps,
+        args.params,
+        args.gflops,
+    )

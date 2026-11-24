@@ -87,12 +87,12 @@ from .head import (
     RTDETRDecoder,
     Segment,
     Segment26,
+    TGADetect,
     WorldDetect,
     YOLOEDetect,
     YOLOESegment,
     YOLOESegment26,
     v10Detect,
-    TGADetect,
 )
 from .transformer import (
     AIFI,

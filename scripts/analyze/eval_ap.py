@@ -11,8 +11,10 @@ stats[] array layout (fixed by pycocotools):
 NOTE: stats[1] is AP50 for ALL sizes, NOT AP_s!
 Previous code incorrectly used stats[1] as AP_s (stats[3] is correct).
 """
-import json
+
 import argparse
+import json
+
 import numpy as np
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -58,41 +60,35 @@ def run_coco_eval(ann_file: str, pred_file: str):
     # Per-size AP50 (for reference — previous code incorrectly used this as AP_s)
     precision = coco_eval.eval["precision"]
     # precision[T=10, R=101, K=10, A=4, M=3] where A=[all,small,medium,large], M=[1,10,100]
-    ap50_all   = float(np.mean(precision[0, :, :, 0, 2]))  # IoU=0.50, area=all
+    ap50_all = float(np.mean(precision[0, :, :, 0, 2]))  # IoU=0.50, area=all
     ap50_small = float(np.mean(precision[0, :, :, 1, 2]))  # IoU=0.50, area=small
-    ap50_med   = float(np.mean(precision[0, :, :, 2, 2]))  # IoU=0.50, area=medium
+    ap50_med = float(np.mean(precision[0, :, :, 2, 2]))  # IoU=0.50, area=medium
     ap50_large = float(np.mean(precision[0, :, :, 3, 2]))  # IoU=0.50, area=large
 
     return {
         # Standard COCO AP (IoU=0.50:0.95)
         "AP_all": stats[0],
-        "AP50":   stats[1],
-        "AP75":   stats[2],
-        "AP_s":   stats[3],  # AP @ IoU=0.50:0.95, small objects  — CORRECT
-        "AP_m":   stats[4],  # AP @ IoU=0.50:0.95, medium objects
-        "AP_l":   stats[5],  # AP @ IoU=0.50:0.95, large objects
+        "AP50": stats[1],
+        "AP75": stats[2],
+        "AP_s": stats[3],  # AP @ IoU=0.50:0.95, small objects  — CORRECT
+        "AP_m": stats[4],  # AP @ IoU=0.50:0.95, medium objects
+        "AP_l": stats[5],  # AP @ IoU=0.50:0.95, large objects
         # Per-size AP50 (supplementary)
-        "AP50_all":   ap50_all,
+        "AP50_all": ap50_all,
         "AP50_small": ap50_small,
-        "AP50_med":   ap50_med,
+        "AP50_med": ap50_med,
         "AP50_large": ap50_large,
     }
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gt", required=True,
-                        help="Ground truth COCO JSON (instances_val.json)")
-    parser.add_argument("--pred", required=True,
-                        help="Predictions JSON from ultralytics save_json=True")
-    parser.add_argument("--output", default=None,
-                        help="Fixed predictions output path")
+    parser.add_argument("--gt", required=True, help="Ground truth COCO JSON (instances_val.json)")
+    parser.add_argument("--pred", required=True, help="Predictions JSON from ultralytics save_json=True")
+    parser.add_argument("--output", default=None, help="Fixed predictions output path")
     args = parser.parse_args()
 
-    fixed_pred = fix_prediction_ids(
-        args.gt, args.pred,
-        args.output or args.pred.replace(".json", "_fixed.json")
-    )
+    fixed_pred = fix_prediction_ids(args.gt, args.pred, args.output or args.pred.replace(".json", "_fixed.json"))
     results = run_coco_eval(args.gt, fixed_pred)
 
     print("\n=== COCO Evaluation Results ===")

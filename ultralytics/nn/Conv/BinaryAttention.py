@@ -4,11 +4,12 @@
 Quantizes Q/K to binary (-1, +1) and V to 8-bit, with STE gradient approximation.
 Adapted from the original YOLO26 design for YOLO11 backbone.
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Function
+
 from typing import Any, NewType
+
+import torch
+from torch import nn
+from torch.autograd import Function
 
 from ultralytics.nn.modules.block import C3k, C3k2
 
@@ -16,6 +17,7 @@ BinaryTensor = NewType("BinaryTensor", torch.Tensor)
 
 
 # ── Binary ops ──────────────────────────────────────────────────────
+
 
 def binary_sign(x: torch.Tensor) -> BinaryTensor:
     """Return -1 if x < 0, 1 if x >= 0."""
@@ -32,7 +34,7 @@ class STESign(Function):
 
     @staticmethod
     def backward(ctx: Any, grad_output: torch.Tensor) -> torch.Tensor:
-        x, = ctx.saved_tensors
+        (x,) = ctx.saved_tensors
         grad_input = grad_output.clone()
         grad_input[x.gt(1)] = 0
         grad_input[x.lt(-1)] = 0
@@ -52,10 +54,7 @@ class SymQuantizer(Function):
             max_input = torch.max(torch.abs(input)).expand_as(input)
         else:
             assert input.ndimension() == 4
-            max_input = (
-                torch.max(torch.abs(input), dim=-2, keepdim=True)[0]
-                .expand_as(input).detach()
-            )
+            max_input = torch.max(torch.abs(input), dim=-2, keepdim=True)[0].expand_as(input).detach()
         s = (2 ** (num_bits - 1) - 1) / (max_input + 1e-6)
         output = torch.round(input * s).div(s + 1e-6)
         return output
@@ -80,15 +79,17 @@ def round_ste(z):
 
 # ── Attention components ────────────────────────────────────────────
 
+
 class Attention(nn.Module):
     """Multi-head self-attention with optional 1-bit Q/K and 8-bit V quantization."""
 
-    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.,
-                 attn_quant=False, pv_quant=False):
+    def __init__(
+        self, dim, num_heads=8, qkv_bias=False, attn_drop=0.0, proj_drop=0.0, attn_quant=False, pv_quant=False
+    ):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = head_dim ** -0.5
+        self.scale = head_dim**-0.5
         self.dim = dim
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -149,15 +150,18 @@ class Attention(nn.Module):
 class BinaryAttentionBlock(nn.Module):
     """Transformer-like block with binary attention, handling 4D→3D→4D reshaping."""
 
-    def __init__(self, dim, num_heads=2, qkv_bias=False, drop=0., attn_drop=0.,
-                 attn_quant=True, pv_quant=True):
+    def __init__(self, dim, num_heads=2, qkv_bias=False, drop=0.0, attn_drop=0.0, attn_quant=True, pv_quant=True):
         super().__init__()
         self.dim = dim
         self.norm1 = nn.LayerNorm(dim)
         self.attn = Attention(
-            dim, num_heads=num_heads, qkv_bias=qkv_bias,
-            attn_drop=attn_drop, proj_drop=drop,
-            attn_quant=attn_quant, pv_quant=pv_quant,
+            dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            attn_drop=attn_drop,
+            proj_drop=drop,
+            attn_quant=attn_quant,
+            pv_quant=pv_quant,
         )
 
     def forward(self, x):
@@ -190,16 +194,16 @@ class C3k_BinaryAttention(C3k):
 class C3k2_BinaryAttention(C3k2):
     """C3k2 module with BinaryAttentionBlock replacing Bottleneck/C3k blocks.
 
-    Args match C3k2: c1, c2, n=1, c3k=False, e=0.5, attn=False, g=1, shortcut=True.
-    Both c3k and attn flags use C3k_BinaryAttention (with attention);
-    when both False, uses plain BinaryAttentionBlock.
+    Args match C3k2: c1, c2, n=1, c3k=False, e=0.5, attn=False, g=1, shortcut=True. Both c3k and attn flags use
+    C3k_BinaryAttention (with attention); when both False, uses plain BinaryAttentionBlock.
     """
 
     def __init__(self, c1, c2, n=1, c3k=False, e=0.5, attn=False, g=1, shortcut=True):
         super().__init__(c1, c2, n, c3k, e, attn, g, shortcut)
         c_ = int(c2 * e)
-        self.m = nn.ModuleList([
-            C3k_BinaryAttention(c_, c_, 2, shortcut, g) if c3k or attn
-            else BinaryAttentionBlock(c_, num_heads=2)
-            for _ in range(n)
-        ])
+        self.m = nn.ModuleList(
+            [
+                C3k_BinaryAttention(c_, c_, 2, shortcut, g) if c3k or attn else BinaryAttentionBlock(c_, num_heads=2)
+                for _ in range(n)
+            ]
+        )

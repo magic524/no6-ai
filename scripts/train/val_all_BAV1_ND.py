@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Validate BAV1 NightDrone all scales via YOLO Python API + eval_ap."""
-import subprocess, sys, re, io
+
+import io
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 GT = "/root/autodl-tmp/datasets/NightDrone/annotations/instances_val.json"
@@ -10,6 +14,7 @@ PROJ = BASE / "val" / "BAV1_ND_final"
 DATA = "NightDrone.yaml"
 
 import shutil
+
 if PROJ.exists():
     shutil.rmtree(PROJ)
 PROJ.mkdir(parents=True)
@@ -20,7 +25,7 @@ results = {}
 
 for scale in ["n", "s", "m", "l", "x"]:
     best = BASE / f"BinaryAttentionV1/NightDrone/yolo11{scale}/weights/best.pt"
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"yolo11{scale} BAV1 NightDrone")
 
     # Load model, get params
@@ -28,14 +33,22 @@ for scale in ["n", "s", "m", "l", "x"]:
     params_m = sum(p.numel() for p in model.model.parameters()) / 1e6
 
     # Val via Python API (creates its own dir)
-    model.val(data=DATA, batch=32, imgsz=640, save_json=True,
-              project=str(PROJ), name=f"yolo11{scale}", device=0,
-              exist_ok=True, verbose=False)
+    model.val(
+        data=DATA,
+        batch=32,
+        imgsz=640,
+        save_json=True,
+        project=str(PROJ),
+        name=f"yolo11{scale}",
+        device=0,
+        exist_ok=True,
+        verbose=False,
+    )
 
     # Re-run with verbose to capture mAP
-    val_out = model.val(data=DATA, batch=32, imgsz=640,
-                        project=str(PROJ), name=f"yolo11{scale}", device=0,
-                        exist_ok=True, plots=False)
+    val_out = model.val(
+        data=DATA, batch=32, imgsz=640, project=str(PROJ), name=f"yolo11{scale}", device=0, exist_ok=True, plots=False
+    )
 
     # Get mAP
     rd = val_out.results_dict if hasattr(val_out, "results_dict") else {}
@@ -53,6 +66,7 @@ for scale in ["n", "s", "m", "l", "x"]:
     gflops = 0
     buf = io.StringIO()
     from contextlib import redirect_stdout
+
     with redirect_stdout(buf):
         model.info()
     for line in buf.getvalue().split("\n"):
@@ -73,8 +87,7 @@ for scale in ["n", "s", "m", "l", "x"]:
     if pred_json and pred_json.exists():
         print(f"eval_ap on {pred_json.name}...")
         r = subprocess.run(
-            [sys.executable, EVAL, "--gt", GT, "--pred", str(pred_json)],
-            capture_output=True, text=True, timeout=600
+            [sys.executable, EVAL, "--gt", GT, "--pred", str(pred_json)], capture_output=True, text=True, timeout=600
         )
         (out_dir / "eval_ap.log").write_text(r.stdout + r.stderr)
         for line in (r.stdout + r.stderr).split("\n"):
@@ -83,9 +96,12 @@ for scale in ["n", "s", "m", "l", "x"]:
                 k = parts[0].rstrip(":")
                 try:
                     v = float(parts[1])
-                    if k == "AP_s": ap_s = v
-                    elif k == "AP_m": ap_m = v
-                    elif k == "AP_l": ap_l = v
+                    if k == "AP_s":
+                        ap_s = v
+                    elif k == "AP_m":
+                        ap_m = v
+                    elif k == "AP_l":
+                        ap_l = v
                 except ValueError:
                     pass
     else:
@@ -107,16 +123,22 @@ GFLOPs={gflops:.1f}
     print(f"Summary saved to {out_dir}/summary.txt")
 
     results[scale] = {
-        "mAP50": map50, "mAP50-95": map95,
-        "AP_s": ap_s, "AP_m": ap_m, "AP_l": ap_l,
-        "Params(M)": params_m, "GFLOPs": gflops
+        "mAP50": map50,
+        "mAP50-95": map95,
+        "AP_s": ap_s,
+        "AP_m": ap_m,
+        "AP_l": ap_l,
+        "Params(M)": params_m,
+        "GFLOPs": gflops,
     }
 
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 print("ALL SCALES COMPLETE!")
-print(f"{'='*60}")
+print(f"{'=' * 60}")
 header = f"{'Scale':>7} {'mAP50':>7} {'mAP50-95':>9} {'AP_s':>7} {'AP_m':>7} {'AP_l':>7} {'Params':>7} {'GFLOPs':>7}"
 print(header)
 for s in ["n", "s", "m", "l", "x"]:
     r = results[s]
-    print(f"{s:>7} {r['mAP50']:.4f} {r['mAP50-95']:.4f} {r['AP_s']:.4f} {r['AP_m']:.4f} {r['AP_l']:.4f} {r['Params(M)']:.2f}M {r['GFLOPs']:.1f}")
+    print(
+        f"{s:>7} {r['mAP50']:.4f} {r['mAP50-95']:.4f} {r['AP_s']:.4f} {r['AP_m']:.4f} {r['AP_l']:.4f} {r['Params(M)']:.2f}M {r['GFLOPs']:.1f}"
+    )

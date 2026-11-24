@@ -4,26 +4,30 @@
 # https://github.com/AI-little-monster/AFFN
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
-from ultralytics.nn.modules.conv import Conv
 from ultralytics.nn.modules.block import C2PSA, PSABlock
 
 
 class AFFN(nn.Module):
-    """Frequency-domain self-correlation FFN.
-    Replaces the standard FFN inside PSABlock with FFT-based auto-correlation fusion.
+    """Frequency-domain self-correlation FFN. Replaces the standard FFN inside PSABlock with FFT-based auto-correlation
+    fusion.
     """
+
     def __init__(self, in_features, hidden_features, out_features, bias=False):
         super().__init__()
         self.dim = in_features
 
         self.project_in = nn.Conv2d(in_features, hidden_features * 2, kernel_size=1, bias=bias)
         self.dwconv = nn.Conv2d(
-            hidden_features * 2, hidden_features * 2,
-            kernel_size=3, stride=1, padding=1,
-            groups=hidden_features * 2, bias=bias
+            hidden_features * 2,
+            hidden_features * 2,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            groups=hidden_features * 2,
+            bias=bias,
         )
         self.project_out = nn.Conv2d(hidden_features, out_features, kernel_size=1, bias=bias)
 
@@ -34,7 +38,7 @@ class AFFN(nn.Module):
     def forward(self, x):
         x = self.project_in(x)
         original_dtype = x.dtype
-        B, C, H, W = x.shape
+        _B, _C, H, W = x.shape
 
         x_float = x.float()
 
@@ -63,6 +67,7 @@ class AFFN(nn.Module):
 
 class PSABlock_AFFN(PSABlock):
     """PSABlock with AFFN replacing the internal FFN."""
+
     def __init__(self, c, attn_ratio=0.5, num_heads=4, shortcut=True) -> None:
         super().__init__(c, attn_ratio, num_heads, shortcut)
         self.ffn = AFFN(c, c * 2, c)
@@ -70,8 +75,7 @@ class PSABlock_AFFN(PSABlock):
 
 class C2PSA_AFFN(C2PSA):
     """C2PSA with PSABlock_AFFN (FFT-based attention)."""
+
     def __init__(self, c1, c2, n=1, e=0.5):
         super().__init__(c1, c2, n, e)
-        self.m = nn.Sequential(
-            *(PSABlock_AFFN(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n))
-        )
+        self.m = nn.Sequential(*(PSABlock_AFFN(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))

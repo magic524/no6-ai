@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Complete rewrite of the Notion tutorial page."""
-import json, subprocess
+
+import json
+import subprocess
 from pathlib import Path
 
 env = Path("/home/magic524/projects/no6-ai/.hermes/.env").read_bytes()
@@ -10,17 +12,29 @@ TOKEN = env[start:end].split(b"=")[1].decode()
 PAGE_ID = "366de3eb-6ec0-811a-a5a2-f1816917b1e9"
 DATA_SOURCE_ID = "35fde3eb-6ec0-80e1-a463-000bf5e295ba"
 
+
 def curl_patch(blocks):
     """Append blocks to page using PATCH."""
     payload = json.dumps({"children": blocks})
-    result = subprocess.run([
-        "curl", "-s", "-X", "PATCH",
-        f"https://api.notion.com/v1/blocks/{PAGE_ID}/children",
-        "-H", f"Authorization: Bearer {TOKEN}",
-        "-H", "Notion-Version: 2025-09-03",
-        "-H", "Content-Type: application/json",
-        "-d", payload
-    ], capture_output=True, text=True)
+    result = subprocess.run(
+        [
+            "curl",
+            "-s",
+            "-X",
+            "PATCH",
+            f"https://api.notion.com/v1/blocks/{PAGE_ID}/children",
+            "-H",
+            f"Authorization: Bearer {TOKEN}",
+            "-H",
+            "Notion-Version: 2025-09-03",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            payload,
+        ],
+        capture_output=True,
+        text=True,
+    )
     data = json.loads(result.stdout)
     if "results" in data:
         return len(data["results"])
@@ -28,35 +42,47 @@ def curl_patch(blocks):
         print(f"ERROR: {data}")
         return 0
 
+
 def t(text, bold=False, code=False):
     ann = {}
-    if bold: ann["bold"] = True
-    if code: ann["code"] = True
+    if bold:
+        ann["bold"] = True
+    if code:
+        ann["code"] = True
     return {"type": "text", "text": {"content": text}, "annotations": ann}
+
 
 def p(text, bold=False):
     return {"type": "paragraph", "paragraph": {"rich_text": [t(text, bold=bold)]}}
 
+
 def h2(text):
     return {"type": "heading_2", "heading_2": {"rich_text": [t(text, bold=True)]}}
+
 
 def h3(text):
     return {"type": "heading_3", "heading_3": {"rich_text": [t(text, bold=True)]}}
 
+
 def b(text):
     return {"type": "bulleted_list_item", "bulleted_list_item": {"rich_text": [t(text)]}}
+
 
 def n(text):
     return {"type": "numbered_list_item", "numbered_list_item": {"rich_text": [t(text)]}}
 
+
 def code(text, lang="python"):
     return {"type": "code", "code": {"rich_text": [t(text)], "language": lang}}
+
 
 def div():
     return {"type": "divider", "divider": {}}
 
+
 def callout(text, emoji="💡"):
     return {"type": "callout", "callout": {"rich_text": [t(text)], "icon": {"emoji": emoji}}}
+
 
 blocks = [
     p("本文档记录了 Notion Internal Integration Token 的配置方法及完整凭证，供私人 Agent 直接调用。"),
@@ -69,7 +95,7 @@ blocks = [
     h2("2️⃣ 配置方式"),
     h3("方式 A：Hermes Agent 本地环境变量"),
     p("Agent 将 Token 注入运行环境，脚本通过 os.environ 读取："),
-    code("export NOTION_API_KEY=\"ntn_59...ghA\"  # 替换为上方 Token", "bash"),
+    code('export NOTION_API_KEY="ntn_59...ghA"  # 替换为上方 Token', "bash"),
     h3("方式 B：项目 .hermes/.env 文件（本地脚本用）"),
     p("在项目根目录的 .hermes/.env 中添加："),
     code(f"NOTION_API_KEY={TOKEN}", "bash"),
@@ -84,7 +110,8 @@ blocks = [
     div(),
     h2("4️⃣ Agent 调用方式"),
     p("Agent 读取本文档获取 Token 后，通过 Notion REST API 进行操作。核心代码如下："),
-    code('''import json, os, urllib.request
+    code(
+        """import json, os, urllib.request
 
 NOTION_TOKEN = os.environ["NOTION_API_KEY"]  # 或从本文档硬编码
 HEADERS = {
@@ -99,7 +126,9 @@ def notion_req(method, path, body=None):
     data = json.dumps(body).encode() if body else None
     req = urllib.request.Request(url, data=data, headers=HEADERS, method=method)
     with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())''', "python"),
+        return json.loads(resp.read())""",
+        "python",
+    ),
     p("关键 API 路径："),
     b("查询数据库/页面：POST /search"),
     b("读取页面内容：GET /blocks/{id}/children"),
@@ -109,8 +138,11 @@ def notion_req(method, path, body=None):
     div(),
     h2("5️⃣ 实验数据库（Baseline）配置"),
     p("实验记录数据库的数据源 ID，Agent 直接使用："),
-    code(f"DATA_SOURCE_ID = \"{DATA_SOURCE_ID}\"", "python"),
-    code(f"数据库 URL：https://www.notion.so/368de3eb6ec080b9b724cb585eaf7b65?v=368de3eb6ec081ddb241000c9f6c362a", "plain text"),
+    code(f'DATA_SOURCE_ID = "{DATA_SOURCE_ID}"', "python"),
+    code(
+        "数据库 URL：https://www.notion.so/368de3eb6ec080b9b724cb585eaf7b65?v=368de3eb6ec081ddb241000c9f6c362a",
+        "plain text",
+    ),
     p('此数据库用于记录 Baseline + 消融实验的各项指标（mAP50/AP_s/m/l/FPS/Params/GFLOPs），类型列区分"基线"和"消融"。'),
     div(),
     h2("6️⃣ 注意事项"),
@@ -126,9 +158,9 @@ def notion_req(method, path, body=None):
 batch_size = 10
 total = 0
 for i in range(0, len(blocks), batch_size):
-    batch = blocks[i:i+batch_size]
+    batch = blocks[i : i + batch_size]
     count = curl_patch(batch)
     total += count
-    print(f"Batch {i//batch_size + 1}: added {count} blocks")
+    print(f"Batch {i // batch_size + 1}: added {count} blocks")
 
 print(f"\n✅ Total: {total} blocks added")
